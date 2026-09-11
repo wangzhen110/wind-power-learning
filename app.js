@@ -333,6 +333,7 @@
     // 重置答题状态
     pool = []; qi = 0; answered = false; chosen = [];
     fpool = []; fq = 0; fanswered = false;
+    if (typeof exResetState === 'function') exResetState();
     view = 'lecture';
     curChap = 0; slideIdx = 0; stopPlay();
     // 填充章节下拉
@@ -800,7 +801,7 @@
   /* ================= 视图切换（课程内四模式） ================= */
   function switchView(v) {
     view = v;
-    ['lecture', 'quiz', 'fill', 'stats'].forEach(function (n) {
+    ['lecture', 'quiz', 'fill', 'exam', 'stats'].forEach(function (n) {
       $('view-' + n).classList.toggle('hidden', n !== v);
     });
     document.querySelectorAll('.mode-btn, .mnav-btn[data-view]').forEach(function (b) {
@@ -809,6 +810,8 @@
     if (v !== 'lecture') stopPlay();
     if (v === 'lecture') renderSlide();
     if (v === 'stats') renderStats();
+    if (v === 'exam') initExamView();
+    if (v !== 'exam') exStopTimer();
     if (v === 'fill' && !fpool.length) fApplyFilter();
     if (v === 'quiz' && !pool.length) {
       $('fChapter').value = String(CHAPTERS[curChap].id);
@@ -1128,6 +1131,376 @@
   $('ffChapter').onchange = fApplyFilter;
   $('ffScope').onchange = fApplyFilter;
   $('ffShuffle').onchange = fApplyFilter;
+
+  /* ================= 模拟考试 / 自动组卷 ================= */
+  var EX = {
+    paper: [], idx: 0, ans: [], marked: {},
+    remainSec: 0, timer: null, startedAt: 0, config: null
+  };
+  function examKey() { return 'unified_v1_' + CURRENT.id + '_' + curUser() + '_exam'; }
+  function examHistLoad() {
+    try { var r = localStorage.getItem(examKey()); if (r) { var a = JSON.parse(r); return Array.isArray(a) ? a : []; } } catch (e) {}
+    return [];
+  }
+  function examHistSave(arr) { try { localStorage.setItem(examKey(), JSON.stringify(arr)); } catch (e) {} }
+  function exGidMap() {
+    var m = {};
+    ALL.forEach(function (it) { m[it.gid] = { type: 'choice', item: it }; });
+    FPOOL.forEach(function (it) { m[it.gid] = { type: 'fill', item: it }; });
+    return m;
+  }
+  function exStopTimer() {
+    if (EX.timer) { clearInterval(EX.timer); EX.timer = null; }
+  }
+  function exResetState() {
+    exStopTimer();
+    EX.paper = []; EX.idx = 0; EX.ans = []; EX.marked = {};
+    EX.remainSec = 0; EX.startedAt = 0; EX.config = null;
+  }
+  function exShowSub(name) {
+    $('exConfig').classList.toggle('hidden', name !== 'config');
+    $('exRunning').classList.toggle('hidden', name !== 'running');
+    $('exResult').classList.toggle('hidden', name !== 'result');
+  }
+  function clampInt(v, lo, hi, dft) {
+    var n = parseInt(v, 10);
+    if (isNaN(n)) n = dft;
+    if (n < lo) n = lo;
+    if (n > hi) n = hi;
+    return n;
+  }
+  function exChapterFilter() { return $('exChapter').value; }
+  function exAvailChoice() {
+    var ch = exChapterFilter();
+    return ALL.filter(function (it) { return ch === 'all' || it.ch.id === parseInt(ch, 10); });
+  }
+  function exAvailFill() {
+    var ch = exChapterFilter();
+    return FPOOL.filter(function (it) { return ch === 'all' || it.q.ch === parseInt(ch, 10); });
+  }
+  function initExamView() {
+    if (!CURRENT) return;
+    exResetState();
+    fillChapterSelect($('exChapter'), true);
+    $('exAvailChoice').textContent = ALL.length;
+    $('exAvailFill').textContent = FPOOL.length;
+    $('exQuizCount').value = 20;
+    $('exFillCount').value = 5;
+    $('exDuration').value = 30;
+    $('exMsg').textContent = '';
+    exShowSub('config');
+  }
+  function shuffle(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
+  }
+  function exBuildPaper() {
+    var availC = exAvailChoice();
+    var availF = exAvailFill();
+    var nC = clampInt($('exQuizCount').value, 1, 100, 20);
+    var nF = clampInt($('exFillCount').value, 0, 50, 5);
+    if (nC > availC.length) nC = availC.length;
+    if (nF > availF.length) nF = availF.length;
+    var dur = clampInt($('exDuration').value, 5, 180, 30);
+    if (nC + nF <= 0) { $('exMsg').textContent = '当前章节范围内没有可用题目，请调整章节范围或题量。'; return null; }
+    var picksC = shuffle(availC.slice()).slice(0, nC).map(function (it) { return { type: 'choice', item: it }; });
+    var picksF = shuffle(availF.slice()).slice(0, nF).map(function (it) { return { type: 'fill', item: it }; });
+    return { list: picksC.concat(picksF), cfg: { nC: nC, nF: nF, dur: dur, ch: exChapterFilter() } };
+  }
+  function exStart() {
+    var res = exBuildPaper();
+    if (!res) return;
+    EX.paper = res.list;
+    EX.config = res.cfg;
+    EX.idx = 0;
+    EX.ans = new Array(EX.paper.length);
+    EX.marked = {};
+    EX.remainSec = res.cfg.dur * 60;
+    EX.startedAt = Date.now();
+    exShowSub('running');
+    exRenderQ();
+    exStopTimer();
+    EX.timer = setInterval(function () {
+      EX.remainSec--;
+      exRenderTimer();
+      if (EX.remainSec <= 0) { exStopTimer(); exSubmitPaper(true); }
+    }, 1000);
+    window.scrollTo(0, 0);
+  }
+  function exRenderTimer() {
+    var s = Math.max(0, EX.remainSec);
+    var mm = Math.floor(s / 60), ss = s % 60;
+    $('exTimer').textContent = (mm < 10 ? '0' + mm : mm) + ':' + (ss < 10 ? '0' + ss : ss);
+    $('exTimer').classList.toggle('timeout', s <= 30);
+  }
+  function exIsAnswered(i) {
+    var a = EX.ans[i];
+    if (!a) return false;
+    if (EX.paper[i].type === 'choice') return a.length > 0;
+    return a.length > 0 && a.every(function (v) { return String(v).trim() !== ''; });
+  }
+  function exCommitFill() {
+    var cur = EX.paper[EX.idx];
+    if (!cur || cur.type !== 'fill') return;
+    var inputs = document.querySelectorAll('#exQOptions .fill-input');
+    var vals = [];
+    for (var i = 0; i < inputs.length; i++) vals.push(inputs[i].value);
+    EX.ans[EX.idx] = vals;
+  }
+  function exTypeLabel(t) {
+    return t === 'single' ? '单选题' : t === 'multi' ? '多选题' : t === 'judge' ? '判断题' : '填空题';
+  }
+  function exRenderQ() {
+    var cur = EX.paper[EX.idx];
+    var q = cur.item.q;
+    exRenderTimer();
+    $('exProgress').textContent = '第 ' + (EX.idx + 1) + ' / 共 ' + EX.paper.length + ' 题';
+    $('exQIdx').textContent = (EX.idx + 1) + ' / ' + EX.paper.length;
+    $('exQMarkTag').textContent = EX.marked[EX.idx] ? '已标记 ★' : '未标记';
+    $('exMark').textContent = EX.marked[EX.idx] ? '取消标记' : '标记';
+    if (cur.type === 'choice') {
+      $('exQChapter').textContent = '第' + cur.item.ch.id + '章 ' + cur.item.ch.title;
+      $('exQType').textContent = exTypeLabel(q.t);
+      $('exQText').textContent = q.q;
+      var wrap = $('exQOptions');
+      wrap.innerHTML = '';
+      wrap.className = 'options' + (q.t === 'multi' ? ' opt-multi' : '');
+      var curPick = EX.ans[EX.idx] || [];
+      optsOf(q).forEach(function (txt, i) {
+        var d = document.createElement('div');
+        d.className = 'opt' + (curPick.indexOf(i) >= 0 ? ' sel' : '');
+        d.innerHTML = '<div class="letter">' + LETTERS[i] + '</div><div>' + escHtml(txt) + '</div>';
+        d.onclick = function () { exPickChoice(i, d); };
+        wrap.appendChild(d);
+      });
+    } else {
+      $('exQChapter').textContent = '第' + q.ch + '章';
+      $('exQType').textContent = '填空题';
+      $('exQText').textContent = q.q;
+      var wrap2 = $('exQOptions');
+      wrap2.innerHTML = '';
+      wrap2.className = 'options fill-opts';
+      var savedVals = EX.ans[EX.idx] || [];
+      q.a.forEach(function (_, i) {
+        var d = document.createElement('div');
+        d.className = 'fill-row';
+        d.innerHTML = '<span class="fill-no">第 ' + (i + 1) + ' 空</span>' +
+          '<input class="fill-input" type="text" autocomplete="off" placeholder="在此输入答案">';
+        wrap2.appendChild(d);
+      });
+      var inputs = wrap2.querySelectorAll('.fill-input');
+      for (var k = 0; k < inputs.length; k++) inputs[k].value = savedVals[k] != null ? savedVals[k] : '';
+    }
+    $('exPrev').disabled = EX.idx === 0;
+    $('exNext').textContent = EX.idx === EX.paper.length - 1 ? '完成本题，交卷' : '下一题 →';
+    exRenderJump();
+  }
+  function exPickChoice(i, el) {
+    var cur = EX.paper[EX.idx];
+    var q = cur.item.q;
+    var pick = (EX.ans[EX.idx] || []).slice();
+    var nodes = $('exQOptions').children;
+    if (q.t === 'multi') {
+      var k = pick.indexOf(i);
+      if (k >= 0) { pick.splice(k, 1); el.classList.remove('sel'); }
+      else { pick.push(i); el.classList.add('sel'); }
+    } else {
+      pick = [i];
+      for (var n = 0; n < nodes.length; n++) nodes[n].classList.remove('sel');
+      el.classList.add('sel');
+    }
+    EX.ans[EX.idx] = pick;
+    exRenderJump();
+  }
+  function exGo(i) {
+    exCommitFill();
+    EX.idx = i;
+    exRenderQ();
+    window.scrollTo(0, 0);
+  }
+  function exRenderJump() {
+    var g = $('exJumpGrid'); g.innerHTML = '';
+    EX.paper.forEach(function (_, i) {
+      var b = document.createElement('button');
+      b.className = 'jump-btn' + (i === EX.idx ? ' cur' : '') +
+        (exIsAnswered(i) ? ' done' : '') + (EX.marked[i] ? ' marked' : '');
+      b.textContent = i + 1;
+      b.onclick = function () { exGo(i); };
+      g.appendChild(b);
+    });
+  }
+  function exGradeChoice(q, pick) {
+    pick = pick || [];
+    return pick.length === q.a.length && q.a.every(function (x) { return pick.indexOf(x) >= 0; });
+  }
+  function exGradeFill(q, vals) {
+    vals = vals || [];
+    if (!vals.length || vals.length !== q.a.length) return false;
+    return q.a.every(function (acc, i) { return fMatch(acc, vals[i]); });
+  }
+  function exSubmitPaper(auto) {
+    exCommitFill();
+    var unanswered = 0;
+    for (var i = 0; i < EX.paper.length; i++) if (!exIsAnswered(i)) unanswered++;
+    if (unanswered > 0 && !auto) {
+      if (!confirm('还有 ' + unanswered + ' 题未作答，未答按错误计。确定交卷吗？')) return;
+    }
+    exStopTimer();
+    var right = 0, details = [];
+    EX.paper.forEach(function (cur, i) {
+      var q = cur.item.q;
+      var ok, userAns, correctAns;
+      if (cur.type === 'choice') {
+        var pick = EX.ans[i] || [];
+        ok = exGradeChoice(q, pick);
+        userAns = pick.map(function (x) { return LETTERS[x]; });
+        correctAns = q.a.map(function (x) { return LETTERS[x]; });
+      } else {
+        var vals = EX.ans[i] || [];
+        ok = exGradeFill(q, vals);
+        userAns = vals.slice();
+        correctAns = q.a.map(function (acc) { return acc.join('/'); });
+      }
+      if (ok) right++;
+      details.push({ gid: cur.item.gid, type: cur.type, ok: ok, userAns: userAns, correctAns: correctAns });
+    });
+    var total = EX.paper.length;
+    var score = Math.round(right / total * 100);
+    var durationSec = Math.max(1, Math.round((Date.now() - EX.startedAt) / 1000));
+    var rec = {
+      id: Date.now(), at: Date.now(), total: total, right: right, score: score,
+      durationSec: durationSec,
+      config: { quiz: EX.config.nC, fill: EX.config.nF, chapter: EX.config.ch },
+      details: details
+    };
+    var hist = examHistLoad();
+    hist.push(rec);
+    examHistSave(hist);
+    exRenderResult(rec);
+    window.scrollTo(0, 0);
+  }
+  function fmtDateTime(ts) {
+    var d = new Date(ts);
+    function p(n) { return (n < 10 ? '0' + n : '' + n); }
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  function fmtDur(sec) {
+    var m = Math.floor(sec / 60), s = sec % 60;
+    return (m ? m + ' 分 ' : '') + s + ' 秒';
+  }
+  function exAnswerText(d) {
+    if (d.type === 'choice') {
+      return (d.userAns && d.userAns.length ? d.userAns.join('、') : '（未答）');
+    }
+    return (d.userAns && d.userAns.length ? d.userAns.join(' / ') : '（未答）');
+  }
+  function exRenderDetailList(rec, map) {
+    var box = $('exDetailList');
+    box.innerHTML = '';
+    rec.details.forEach(function (d, i) {
+      var ref = map[d.gid];
+      var q = ref ? ref.item.q : null;
+      var chTxt = '';
+      if (ref && ref.item.ch && ref.item.ch.id) chTxt = '第' + ref.item.ch.id + '章';
+      var div = document.createElement('div');
+      div.className = 'ex-detail' + (d.ok ? ' ok' : ' bad');
+      var head = '<div class="xd-head"><span class="xd-no">第 ' + (i + 1) + ' 题</span>' +
+        '<span class="tag type">' + (d.type === 'choice' ? exTypeLabel(q.t) : '填空题') + '</span>' +
+        (chTxt ? '<span class="tag">' + escHtml(chTxt) + '</span>' : '') +
+        '<span class="xd-flag ' + (d.ok ? 'ok' : 'bad') + '">' + (d.ok ? '✓ 答对' : '✗ 答错') + '</span></div>';
+      var qtxt = '<div class="xd-q">' + escHtml(q ? q.q : '（题目已不在题库中）') + '</div>';
+      var ans = '<div class="xd-ans"><span class="xd-ur">你的答案：' + escHtml(exAnswerText(d)) + '</span>' +
+        '<span class="xd-cr">正确答案：' + escHtml((d.correctAns || []).join(' / ')) + '</span></div>';
+      var ex = q ? '<div class="xd-ex">解析：' + linkStandards(q.e || '（无解析）') + '</div>' : '';
+      var src = q && q.s ? '<div class="xd-src"><button type="button" class="src-link" data-src="' + escHtml(q.s) + '">出处：' + escHtml(q.s) + ' <span class="src-arrow">▸</span></button></div>' : '';
+      div.innerHTML = head + qtxt + ans + ex + src;
+      box.appendChild(div);
+    });
+  }
+  function exRenderResult(rec) {
+    exShowSub('result');
+    var rate = rec.total ? Math.round(rec.right / rec.total * 100) + '%' : '—';
+    $('exResultCards').innerHTML =
+      '<div class="scard"><b>' + rec.score + '</b><span>总分（百分制）</span></div>' +
+      '<div class="scard"><b>' + rec.right + ' / ' + rec.total + '</b><span>答对 / 总题数</span></div>' +
+      '<div class="scard"><b>' + rate + '</b><span>正确率</span></div>' +
+      '<div class="scard"><b>' + fmtDur(rec.durationSec) + '</b><span>用时</span></div>' +
+      '<div class="scard"><b>' + fmtDateTime(rec.at) + '</b><span>考试时间</span></div>';
+    exRenderDetailList(rec, exGidMap());
+  }
+  function exRenderHistList(hist) {
+    var body = $('examHistBody');
+    body.innerHTML = '';
+    if (!hist.length) {
+      body.innerHTML = '<div class="empty">还没有模拟考试记录。去「开始考试」完成一次后即可在此查看。</div>';
+      return;
+    }
+    var list = document.createElement('div');
+    list.className = 'ex-hist-list';
+    hist.slice().sort(function (a, b) { return b.at - a.at; }).forEach(function (rec) {
+      var rate = rec.total ? Math.round(rec.right / rec.total * 100) + '%' : '—';
+      var row = document.createElement('div');
+      row.className = 'ex-hist-row';
+      row.innerHTML =
+        '<div class="xh-main"><b>' + rec.score + ' 分</b>' +
+        '<span>' + rec.right + '/' + rec.total + ' 题 · 正确率 ' + rate + '</span></div>' +
+        '<div class="xh-sub">' + fmtDateTime(rec.at) + ' · 用时 ' + fmtDur(rec.durationSec) +
+        ' · 选择' + rec.config.quiz + ' 填空' + rec.config.fill + '</div>' +
+        '<button type="button" class="mini-btn xh-view">查看详情</button>';
+      row.querySelector('.xh-view').onclick = function () {
+        exRenderDetailList(rec, exGidMap());
+        closeExamHist();
+        exShowSub('result');
+        window.scrollTo(0, 0);
+      };
+      list.appendChild(row);
+    });
+    body.appendChild(list);
+    var clearBtn = document.createElement('button');
+    clearBtn.className = 'ctrl-btn';
+    clearBtn.style.marginTop = '14px';
+    clearBtn.textContent = '清空历史成绩';
+    clearBtn.onclick = function () {
+      if (!confirm('确定清空当前账号在本课程的全部模拟考试历史成绩吗？此操作不可撤销。')) return;
+      examHistSave([]);
+      exRenderHistList([]);
+    };
+    body.appendChild(clearBtn);
+  }
+  function openExamHist() {
+    $('examHistModal').classList.remove('hidden');
+    exRenderHistList(examHistLoad());
+  }
+  function closeExamHist() { $('examHistModal').classList.add('hidden'); }
+
+  /* ---------- 考试模块事件 ---------- */
+  $('exStart').onclick = exStart;
+  $('exNext').onclick = function () {
+    if (EX.idx < EX.paper.length - 1) exGo(EX.idx + 1);
+    else exSubmitPaper(false);
+  };
+  $('exPrev').onclick = function () { if (EX.idx > 0) exGo(EX.idx - 1); };
+  $('exMark').onclick = function () {
+    if (EX.marked[EX.idx]) delete EX.marked[EX.idx]; else EX.marked[EX.idx] = true;
+    $('exQMarkTag').textContent = EX.marked[EX.idx] ? '已标记 ★' : '未标记';
+    $('exMark').textContent = EX.marked[EX.idx] ? '取消标记' : '标记';
+    exRenderJump();
+  };
+  $('exSubmit').onclick = function () { exSubmitPaper(false); };
+  $('exRetry').onclick = function () { initExamView(); window.scrollTo(0, 0); };
+  $('exHistory').onclick = openExamHist;
+  $('exHistory2').onclick = openExamHist;
+  $('examHistClose').onclick = closeExamHist;
+  $('examHistMask').onclick = closeExamHist;
+  $('exChapter').onchange = function () {
+    var availC = exAvailChoice();
+    var availF = exAvailFill();
+    $('exAvailChoice').textContent = availC.length;
+    $('exAvailFill').textContent = availF.length;
+  };
 
   /* ================= 门户（课程选择） ================= */
   function renderPortal() {

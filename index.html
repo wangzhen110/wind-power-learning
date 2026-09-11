@@ -113,6 +113,7 @@
     <button class="mnav-btn active" data-view="lecture">讲解</button>
     <button class="mnav-btn" data-view="quiz">答题</button>
     <button class="mnav-btn" data-view="fill">填空</button>
+    <button class="mnav-btn" data-view="exam">模拟考试</button>
     <button class="mnav-btn" data-view="stats">统计</button>
   </div>
   <div class="mnav-row">
@@ -127,6 +128,7 @@
       <button class="mode-btn active" data-view="lecture">讲解</button>
       <button class="mode-btn" data-view="quiz">答题</button>
       <button class="mode-btn" data-view="fill">填空</button>
+      <button class="mode-btn" data-view="exam">模拟考试</button>
       <button class="mode-btn" data-view="stats">统计</button>
     </div>
     <div class="chap-title">章节目录</div>
@@ -294,6 +296,90 @@
       <div class="wrong-list" id="wrongList"></div>
     </section>
 
+    <!-- ============ 模拟考试视图 ============ -->
+    <section id="view-exam" class="view hidden">
+
+      <!-- 子面板：组卷配置 -->
+      <div id="exConfig">
+        <h2 class="sec-title">模拟考试 · 自动组卷</h2>
+        <div class="qcard ex-panel">
+          <div class="ex-form">
+            <div class="ex-field">
+              <label>选择题数量（当前题库 <span id="exAvailChoice">0</span> 题）</label>
+              <input type="number" id="exQuizCount" min="1" max="100" value="20">
+            </div>
+            <div class="ex-field">
+              <label>填空题数量（当前题库 <span id="exAvailFill">0</span> 题，0 表示不考填空）</label>
+              <input type="number" id="exFillCount" min="0" max="50" value="5">
+            </div>
+            <div class="ex-field">
+              <label>章节范围</label>
+              <select id="exChapter"><option value="all">全部章节</option></select>
+            </div>
+            <div class="ex-field">
+              <label>考试时长（分钟，5-180）</label>
+              <input type="number" id="exDuration" min="5" max="180" value="30">
+            </div>
+          </div>
+          <div class="ex-msg" id="exMsg"></div>
+          <div class="ex-actions">
+            <button class="ctrl-btn primary big" id="exStart">开始考试</button>
+            <button class="ctrl-btn" id="exHistory">查看历史成绩</button>
+          </div>
+          <div class="tip">每次「开始考试」都会从题库随机抽取并重新组卷，题目顺序随机；考试成绩按「账号 + 课程」独立保存。</div>
+        </div>
+      </div>
+
+      <!-- 子面板：考试中 -->
+      <div id="exRunning" class="hidden">
+        <div class="ex-bar">
+          <div class="ex-bar-left">
+            <span class="ex-bar-title">模拟考试</span>
+            <span class="ex-timer" id="exTimer">30:00</span>
+          </div>
+          <div class="ex-bar-right">
+            <span class="ex-progress" id="exProgress">第 1 / 共 0 题</span>
+            <button class="ctrl-btn primary" id="exSubmit">交卷</button>
+          </div>
+        </div>
+
+        <div class="qcard">
+          <div class="qmeta">
+            <span class="tag" id="exQChapter">章节</span>
+            <span class="tag type" id="exQType">题型</span>
+            <span class="tag idx" id="exQIdx">1 / 1</span>
+            <span class="tag" id="exQMarkTag">未标记</span>
+          </div>
+          <h3 class="qtext" id="exQText"></h3>
+          <div class="options" id="exQOptions"></div>
+
+          <div class="qactions">
+            <button class="ctrl-btn" id="exPrev">上一题</button>
+            <button class="ctrl-btn ghost" id="exMark">标记</button>
+            <button class="ctrl-btn primary" id="exNext">下一题 →</button>
+          </div>
+        </div>
+
+        <div class="jump">
+          <div class="jump-label">答题卡（已答 / 未答 / 当前题）</div>
+          <div class="jump-grid" id="exJumpGrid"></div>
+        </div>
+      </div>
+
+      <!-- 子面板：成绩结果 -->
+      <div id="exResult" class="hidden">
+        <h2 class="sec-title">考试成绩</h2>
+        <div class="stat-cards" id="exResultCards"></div>
+        <h2 class="sec-title">答题详情</h2>
+        <div class="ex-detail-list" id="exDetailList"></div>
+        <div class="ex-result-actions">
+          <button class="ctrl-btn primary" id="exRetry">再考一次</button>
+          <button class="ctrl-btn" id="exHistory2">查看历史成绩</button>
+        </div>
+      </div>
+
+    </section>
+
   </main>
 </div>
 
@@ -330,6 +416,18 @@
       <button class="modal-x" id="kbClose">×</button>
     </div>
     <div class="modal-body kb-body" id="kbBody"></div>
+  </div>
+</div>
+
+<!-- 模拟考试历史成绩弹窗 -->
+<div class="modal hidden" id="examHistModal">
+  <div class="modal-mask" id="examHistMask"></div>
+  <div class="modal-box exam-hist-box">
+    <div class="modal-head">
+      <h3>历史模拟考试成绩（当前账号 · 当前课程）</h3>
+      <button class="modal-x" id="examHistClose">×</button>
+    </div>
+    <div class="modal-body" id="examHistBody"></div>
   </div>
 </div>
 

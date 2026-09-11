@@ -487,3 +487,83 @@ button{font-family:inherit;cursor:pointer}
   .portal-brand h1{font-size:17px}
   .course-bar{padding:8px 10px}
 }
+
+/* ============================================================
+   模拟考试 / 自动组卷 模块（复用既有 CSS 变量与组件）
+   ============================================================ */
+.ex-panel{max-width:720px}
+.ex-form{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px;margin-bottom:6px}
+.ex-field{display:flex;flex-direction:column;gap:6px}
+.ex-field label{font-size:13px;color:var(--ink-2);font-weight:600}
+.ex-field input,.ex-field select{
+  padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;
+  font-size:14px;color:var(--ink);font-family:inherit;outline:none;
+}
+.ex-field input:focus,.ex-field select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.ex-msg{font-size:13.5px;color:var(--bad);min-height:20px;margin:8px 0 4px}
+.ex-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.ex-result-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+
+/* 考试中顶栏 */
+.ex-bar{
+  display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:11px 14px;margin-bottom:16px;position:sticky;top:73px;z-index:15;
+}
+.ex-bar-left{display:flex;align-items:center;gap:12px}
+.ex-bar-title{font-size:15px;font-weight:700;color:var(--accent)}
+.ex-timer{
+  font-size:17px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;
+  background:var(--line-soft);padding:4px 12px;border-radius:8px;
+}
+.ex-timer.timeout{color:var(--bad);background:var(--bad-soft)}
+.ex-bar-right{display:flex;align-items:center;gap:12px}
+.ex-progress{font-size:13px;color:var(--ink-2)}
+
+/* 答题卡：已标记 */
+.jump-btn.marked{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
+
+/* 结果详情 */
+.ex-detail-list{display:flex;flex-direction:column;gap:12px;margin-bottom:18px}
+.ex-detail{
+  background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--line);
+  border-radius:10px;padding:14px 16px;
+}
+.ex-detail.ok{border-left-color:var(--ok)}
+.ex-detail.bad{border-left-color:var(--bad)}
+.xd-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.xd-no{font-size:13.5px;font-weight:700;color:var(--ink)}
+.xd-flag{font-size:12.5px;font-weight:700;margin-left:auto;padding:2px 10px;border-radius:20px}
+.xd-flag.ok{background:var(--ok-soft);color:var(--ok)}
+.xd-flag.bad{background:var(--bad-soft);color:var(--bad)}
+.xd-q{font-size:15px;font-weight:600;color:var(--ink);line-height:1.7;margin-bottom:8px}
+.xd-ans{display:flex;gap:18px;flex-wrap:wrap;font-size:13.5px;margin-bottom:8px}
+.xd-ur{color:var(--bad)}
+.xd-cr{color:var(--ok);font-weight:600}
+.xd-ex{font-size:13.5px;color:var(--ink-2);line-height:1.8;margin-bottom:8px}
+.xd-src{margin-top:4px}
+
+/* 历史成绩弹窗 */
+.ex-hist-box{max-width:640px}
+.ex-hist-list{display:flex;flex-direction:column;gap:10px}
+.ex-hist-row{
+  border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:#fff;
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;
+}
+.xh-main{display:flex;align-items:baseline;gap:10px;font-size:14.5px}
+.xh-main b{font-size:18px;color:var(--accent)}
+.xh-main span{font-size:13px;color:var(--ink-2)}
+.xh-sub{flex:1 1 100%;font-size:12.5px;color:var(--ink-3)}
+.xh-view{width:auto;flex:0 0 auto;padding:6px 14px}
+.xh-view:hover{border-color:var(--accent);color:var(--accent)}
+
+@media(max-width:640px){
+  .ex-form{grid-template-columns:1fr}
+  .ex-bar{position:static;top:auto}
+  .ex-bar-left{width:100%;justify-content:space-between}
+  .ex-bar-right{width:100%;justify-content:space-between}
+  .xd-ans{flex-direction:column;gap:4px}
+  /* 移动端导航含 5 个模式按钮（讲解/答题/填空/模拟考试/统计），缩小字号与内边距避免横向裁切 */
+  .mnav-btn{font-size:10.5px;padding:0 3px;min-height:40px;letter-spacing:0}
+  .mnav-btn.ghost{font-size:12px;padding:0 10px}
+}
