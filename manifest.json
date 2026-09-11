@@ -1,0 +1,15 @@
+{
+  "name": "风电标准学习平台",
+  "short_name": "风电学习平台",
+  "description": "风力发电行业标准互动学习平台 · GB/T 46154 · NB/T 11773 · NB/T 10991 · 账号独立进度",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f3f6fb",
+  "theme_color": "#1a56db",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

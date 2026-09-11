@@ -1,0 +1,4 @@
+_verify/node_modules/
+_verify/package.json
+_verify/package-lock.json
+*.log

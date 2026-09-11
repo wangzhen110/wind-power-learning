@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1a56db">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="风电标准学习平台">
+<meta name="description" content="风力发电行业标准互动学习平台 · GB/T 46154 · NB/T 11773 · NB/T 10991 · 账号独立进度">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>风电标准学习平台 · 统一登录</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============ 登录视图 ============ -->
+<section id="view-login" class="auth-view">
+  <div class="auth-bg"></div>
+  <div class="auth-card">
+    <div class="auth-brand">
+      <div class="auth-logo">风</div>
+      <h1>风电标准学习平台</h1>
+      <p>三套标准课程 · 账号独立进度 · 登录后开始学习</p>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tabLogin">登 录</button>
+      <button class="auth-tab" id="tabReg">注册账号</button>
+    </div>
+
+    <!-- 登录表单 -->
+    <form class="auth-form" id="formLogin" autocomplete="on">
+      <label>账号</label>
+      <input type="text" id="liUser" placeholder="输入你的账号" autocomplete="username" maxlength="30">
+      <label>密码</label>
+      <input type="password" id="liPass" placeholder="输入密码" autocomplete="current-password" maxlength="64">
+      <div class="auth-msg" id="liMsg"></div>
+      <button type="submit" class="auth-btn">登 录</button>
+    </form>
+
+    <!-- 注册表单 -->
+    <form class="auth-form hidden" id="formReg" autocomplete="off">
+      <label>账号（用于登录，创建后不可修改）</label>
+      <input type="text" id="rgUser" placeholder="字母 / 数字 / 下划线，2-20位" maxlength="20">
+      <label>昵称（选填，显示在学习页）</label>
+      <input type="text" id="rgNick" placeholder="你的称呼，如：张工" maxlength="20">
+      <label>密码</label>
+      <input type="password" id="rgPass" placeholder="至少 4 位" maxlength="64">
+      <label>确认密码</label>
+      <input type="password" id="rgPass2" placeholder="再输一遍密码" maxlength="64">
+      <div class="auth-msg" id="rgMsg"></div>
+      <button type="submit" class="auth-btn">创建账号并登录</button>
+    </form>
+    <div class="auth-foot">账号数据保存在当前设备的浏览器中；换设备时请用课程内的「导出 / 导入进度」迁移。</div>
+  </div>
+</section>
+
+<!-- ============ 课程选择视图 ============ -->
+<section id="view-portal" class="portal-view hidden">
+  <header class="portal-head">
+    <div class="portal-brand">
+      <div class="logo">风</div>
+      <div class="brand-text">
+        <h1>风电标准学习平台</h1>
+        <p>选择一门课程开始学习</p>
+      </div>
+    </div>
+    <div class="portal-user">
+      <span class="user-nick" id="portalUser">—</span>
+      <button class="mini-btn" id="btnLogout">退出登录</button>
+    </div>
+  </header>
+  <div class="portal-grid" id="portalGrid"></div>
+  <div class="portal-foot">答题进度按「账号 + 课程」独立保存，互不影响。</div>
+</section>
+
+<!-- ============ 课程学习视图 ============ -->
+<section id="view-course" class="course-view hidden">
+
+<header class="topbar">
+  <div class="brand">
+    <div class="logo" id="courseLogo">GB</div>
+    <div class="brand-text">
+      <h1 id="courseTitle">课程标题</h1>
+      <p id="courseSub">标准号 · 互动学习课程 · <span id="totalCount">0</span> 道权威题库</p>
+    </div>
+  </div>
+  <div class="topstats">
+    <div class="stat"><span class="stat-num" id="sDone">0</span><span class="stat-lbl">已答</span></div>
+    <div class="stat"><span class="stat-num" id="sRight">0</span><span class="stat-lbl">答对</span></div>
+    <div class="stat"><span class="stat-num" id="sRate">—</span><span class="stat-lbl">正确率</span></div>
+    <div class="stat"><span class="stat-num" id="sWrong">0</span><span class="stat-lbl">错题</span></div>
+  </div>
+</header>
+
+<!-- 课程级导航（切换课程 / 当前账号） -->
+<div class="course-bar">
+  <div class="course-bar-left">
+    <button class="mini-btn" id="btnBackPortal">← 全部课程</button>
+    <span class="course-bar-name" id="courseBarName">课程</span>
+  </div>
+  <div class="course-bar-right">
+    <span class="course-bar-user" id="courseBarUser">—</span>
+    <button class="mini-btn" id="btnLogout2">退出</button>
+  </div>
+</div>
+
+<!-- 移动端导航（窄屏显示，宽屏隐藏） -->
+<div class="mnav" id="mNav">
+  <div class="mnav-row">
+    <button class="mnav-btn active" data-view="lecture">讲解</button>
+    <button class="mnav-btn" data-view="quiz">答题</button>
+    <button class="mnav-btn" data-view="fill">填空</button>
+    <button class="mnav-btn" data-view="stats">统计</button>
+  </div>
+  <div class="mnav-row">
+    <select id="mChapter" class="mnav-sel"></select>
+    <button class="mnav-btn ghost" id="mSync">进度同步</button>
+  </div>
+</div>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="modes">
+      <button class="mode-btn active" data-view="lecture">讲解</button>
+      <button class="mode-btn" data-view="quiz">答题</button>
+      <button class="mode-btn" data-view="fill">填空</button>
+      <button class="mode-btn" data-view="stats">统计</button>
+    </div>
+    <div class="chap-title">章节目录</div>
+    <nav id="chapNav" class="chap-nav"></nav>
+    <div class="side-foot">
+      <button class="mini-btn" id="btnSync2">导出 / 导入进度</button>
+      <button class="mini-btn" id="btnReset">清空学习记录</button>
+      <div class="tip">记录保存在本机浏览器（当前账号独立）。换设备学习请先导出，再到新设备导入。</div>
+    </div>
+  </aside>
+
+  <main class="content">
+
+    <!-- ============ 讲解视图 ============ -->
+    <section id="view-lecture" class="view">
+      <div class="lec-head">
+        <div>
+          <div class="lec-chap" id="lecChap">第 1 章</div>
+          <h2 id="lecTitle">章节标题</h2>
+        </div>
+        <div class="lec-ctrl">
+          <button class="ctrl-btn" id="lecPrev">上一屏</button>
+          <button class="ctrl-btn" id="lecSpeak">语音讲解</button>
+          <button class="ctrl-btn primary" id="lecPlay">自动播放</button>
+          <button class="ctrl-btn" id="lecNext">下一屏</button>
+        </div>
+      </div>
+      <div class="player">
+        <div class="progress"><div class="progress-bar" id="lecBar"></div></div>
+        <div class="slide" id="lecSlide"></div>
+        <div class="slide-nav">
+          <span id="lecIdx">1 / 1</span>
+          <div class="dots" id="lecDots"></div>
+        </div>
+      </div>
+      <div class="lec-after">
+        <button class="ctrl-btn big" id="lecToQuiz">学完了，去做本章题目 →</button>
+      </div>
+    </section>
+
+    <!-- ============ 答题视图 ============ -->
+    <section id="view-quiz" class="view hidden">
+      <div class="quiz-bar">
+        <select id="fChapter"><option value="all">全部章节</option></select>
+        <select id="fType">
+          <option value="all">全部题型</option>
+          <option value="single">单选题</option>
+          <option value="multi">多选题</option>
+          <option value="judge">判断题</option>
+        </select>
+        <select id="fScope">
+          <option value="all">全部题目</option>
+          <option value="undo">未作答</option>
+          <option value="wrong">我的错题</option>
+          <option value="right">已答对</option>
+        </select>
+        <label class="shuffle"><input type="checkbox" id="fShuffle"> 随机打乱</label>
+        <span class="quiz-range" id="quizRange">—</span>
+      </div>
+
+      <div class="qcard">
+        <div class="qmeta">
+          <span class="tag" id="qChapter">章节</span>
+          <span class="tag type" id="qType">题型</span>
+          <span class="tag idx" id="qIdx">1 / 1</span>
+          <span class="tag src" id="qSourceTag">出处</span>
+        </div>
+        <h3 class="qtext" id="qText"></h3>
+        <div class="options" id="qOptions"></div>
+
+        <div class="feedback hidden" id="qFeedback">
+          <div class="fb-head" id="fbHead"></div>
+          <div class="fb-body">
+            <div class="fb-block">
+              <div class="fb-label">正确答案</div>
+              <div class="fb-answer" id="fbAnswer"></div>
+            </div>
+            <div class="fb-block">
+              <div class="fb-label">为什么</div>
+              <div class="fb-explain" id="fbExplain"></div>
+            </div>
+            <div class="fb-block">
+              <div class="fb-label">出处</div>
+              <div class="fb-source" id="fbSource"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="qactions">
+          <button class="ctrl-btn" id="qPrev">上一题</button>
+          <button class="ctrl-btn ghost" id="qMark">标记错题</button>
+          <button class="ctrl-btn primary" id="qNext">下一题 →</button>
+        </div>
+      </div>
+
+      <div class="jump">
+        <div class="jump-label">快速跳题</div>
+        <div class="jump-grid" id="jumpGrid"></div>
+      </div>
+    </section>
+
+    <!-- ============ 填空题视图（巩固模式） ============ -->
+    <section id="view-fill" class="view hidden">
+      <div class="quiz-bar">
+        <select id="ffChapter"><option value="all">全部章节</option></select>
+        <select id="ffScope">
+          <option value="all">全部题目</option>
+          <option value="undo">未作答</option>
+          <option value="wrong">我的错题</option>
+          <option value="right">已答对</option>
+        </select>
+        <label class="shuffle"><input type="checkbox" id="ffShuffle"> 随机打乱</label>
+        <span class="quiz-range" id="ffRange">—</span>
+      </div>
+      <div class="fill-stats" id="ffStats"></div>
+
+      <div class="qcard">
+        <div class="qmeta">
+          <span class="tag" id="fqChapter">章节</span>
+          <span class="tag type" id="fqType">填空题</span>
+          <span class="tag idx" id="fqIdx">1 / 1</span>
+          <span class="tag src" id="fqSourceTag">出处</span>
+        </div>
+        <h3 class="qtext" id="fqText"></h3>
+        <div class="options" id="fqOptions"></div>
+
+        <div class="feedback hidden" id="fqFeedback">
+          <div class="fb-head" id="ffbHead"></div>
+          <div class="fb-body">
+            <div class="fb-block">
+              <div class="fb-label">正确答案</div>
+              <div class="fb-answer" id="ffbAnswer"></div>
+            </div>
+            <div class="fb-block">
+              <div class="fb-label">为什么</div>
+              <div class="fb-explain" id="ffbExplain"></div>
+            </div>
+            <div class="fb-block">
+              <div class="fb-label">出处</div>
+              <div class="fb-source" id="ffbSource"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="qactions">
+          <button class="ctrl-btn" id="fqPrev">上一题</button>
+          <button class="ctrl-btn ghost" id="fqMark">标记错题</button>
+          <button class="ctrl-btn primary" id="fqNext">提交答案</button>
+        </div>
+      </div>
+
+      <div class="jump">
+        <div class="jump-label">快速跳题</div>
+        <div class="jump-grid" id="fjumpGrid"></div>
+      </div>
+    </section>
+
+    <!-- ============ 统计视图 ============ -->
+    <section id="view-stats" class="view hidden">
+      <h2 class="sec-title">学习统计</h2>
+      <div class="stat-cards" id="statCards"></div>
+      <h2 class="sec-title">各章掌握情况</h2>
+      <div class="chap-stats" id="chapStats"></div>
+      <h2 class="sec-title">错题清单</h2>
+      <div class="wrong-list" id="wrongList"></div>
+    </section>
+
+  </main>
+</div>
+
+<!-- 进度同步弹窗 -->
+<div class="modal hidden" id="syncModal">
+  <div class="modal-mask" id="syncMask"></div>
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>学习进度同步</h3>
+      <button class="modal-x" id="syncClose">×</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-tip">
+        进度保存在<b>当前设备的浏览器</b>里（按当前账号独立存储），不会自动跨设备同步。换电脑或换手机时，
+        在旧设备点「导出进度」存下文件，到新设备点「导入进度」选该文件即可无缝继续。
+      </p>
+      <div class="modal-acts">
+        <button class="ctrl-btn primary" id="btnExport">导出进度（下载文件）</button>
+        <button class="ctrl-btn" id="btnImport">导入进度（选择文件）</button>
+        <input type="file" id="fileInput" accept=".json,application/json" hidden>
+      </div>
+      <div class="modal-status" id="syncStatus"></div>
+      <div class="modal-sum" id="syncSum"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 知识库弹窗（出处/引用规范点击后在课程内查看知识点，不跳外部网页） -->
+<div class="modal hidden" id="kbModal">
+  <div class="modal-mask" id="kbMask"></div>
+  <div class="modal-box kb-box">
+    <div class="modal-head">
+      <h3 id="kbTitle">知识点</h3>
+      <button class="modal-x" id="kbClose">×</button>
+    </div>
+    <div class="modal-body kb-body" id="kbBody"></div>
+  </div>
+</div>
+
+<!-- 添加到主屏幕提示 -->
+<div class="install-tip hidden" id="installTip">
+  <div class="it-text">
+    <b>装到手机桌面</b>
+    <span id="installGuide">添加后断网也能学</span>
+  </div>
+  <div class="it-btns">
+    <button class="it-btn" id="installDo">添加</button>
+    <button class="it-btn ghost" id="installNo">不用</button>
+  </div>
+</div>
+
+<script src="data/meta.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
