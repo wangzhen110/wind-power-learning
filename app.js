@@ -414,22 +414,66 @@
     if (!CURRENT) return null;
     return CURRENT.kbMap(p);
   }
+  function stdNorm(s) {
+    return String(s || '').replace(/\s+/g, '').replace(/[—–]/g, '-').toUpperCase();
+  }
+  var stdIdx = null, stdIdxKB = null;
+  function buildStdIdx() {
+    if (stdIdx && stdIdxKB === window.KB) return;
+    stdIdxKB = window.KB;
+    stdIdx = {};
+    if (window.KB && KB.standards) {
+      Object.keys(KB.standards).forEach(function (k) { stdIdx[stdNorm(k)] = k; });
+    }
+  }
+  function kbBadge(type) {
+    var m = { clause: '条款', std: '规范', chapter: '章节', table: '图表', figure: '图表', front: '文首', appendix: '附录', none: '未收录' };
+    var c = { clause: 'c', std: 's', chapter: 'h', table: 't', figure: 't', front: 'f', appendix: 'a', none: 'n' };
+    return '<span class="kb-badge kb-badge-' + (c[type] || 'n') + '">' + (m[type] || '未收录') + '</span>';
+  }
+  function kbTypeOf(key) {
+    if (!key) return 'none';
+    if (window.KB && KB.standards && KB.standards[key]) return 'std';
+    if (window.KB && KB.items && KB.items[key]) return 'clause';
+    if (window.KB && KB.special && KB.special[key]) {
+      if (/^第/.test(key)) return 'chapter';
+      if (/^表/.test(key)) return 'table';
+      if (/^图/.test(key)) return 'figure';
+      if (/^附录/.test(key)) return 'appendix';
+      if (/^(封面|前言|引言)/.test(key)) return 'front';
+      return 'chapter';
+    }
+    return 'none';
+  }
+  function kbLookup(p) {
+    var key = kbMap(p);
+    if (key) return key;
+    buildStdIdx();
+    var n = stdNorm(p);
+    if (stdIdx && stdIdx[n]) return stdIdx[n];
+    return null;
+  }
   function openKb(src, label) {
     if (!window.KB) { alert('知识库未加载'); return; }
+    buildStdIdx();
     var parts = src.split(/[；;，,、+~～]/).map(function (s) { return s.trim(); }).filter(Boolean);
     var html = '';
     parts.forEach(function (p) {
-      var key = kbMap(p);
+      var key = kbLookup(p);
       var entry = key && (KB.items[key] || KB.special[key] || KB.standards[key]);
       if (entry) {
-        var head = '<div class="kb-key">' + escHtml(key) + (entry.t ? ' ' + escHtml(entry.t) : '') + '</div>';
+        var type = kbTypeOf(key);
+        var tRaw = String(entry.t || '');
+        var tDup = tRaw.replace(/\s+/g, '') === String(key).replace(/\s+/g, '');
+        var title = (tRaw && !tDup) ? ' <span class="kb-title-sep">·</span> <span class="kb-key-title">' + escHtml(tRaw) + '</span>' : '';
+        var head = '<div class="kb-key">' + kbBadge(type) + '<span class="kb-key-name">' + escHtml(key) + '</span>' + title + '</div>';
         var text = '<div class="kb-text">' + escHtml(entry.c) + '</div>';
-        html += '<div class="kb-item">' + head + text + '</div>';
+        html += '<div class="kb-item kb-item-' + type + '">' + head + text + '</div>';
       } else {
-        html += '<div class="kb-item"><div class="kb-key">' + escHtml(p) + '</div><div class="kb-text">（该出处暂无知识库条目）</div></div>';
+        html += '<div class="kb-item kb-item-none">' + kbBadge('none') + '<div class="kb-key kb-key-name">' + escHtml(p) + '</div><div class="kb-text kb-missing">该出处暂未收录知识库条目，可查看对应课程讲解或原标准文本。</div></div>';
       }
     });
-    $('kbTitle').textContent = label + '：' + src;
+    $('kbTitle').textContent = '出处 · ' + src;
     $('kbBody').innerHTML = html;
     $('kbModal').classList.remove('hidden');
   }
