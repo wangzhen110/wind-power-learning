@@ -419,12 +419,48 @@
     return String(s || '').replace(/\s+/g, '').replace(/[—–]/g, '-').toUpperCase();
   }
   var stdIdx = null, stdIdxKB = null;
+  var stdBasePrefixes = null;
+  function stripYear(normKey) {
+    return String(normKey || '').replace(/-\d{4}$/, '');
+  }
+  function addStdAlias(normInput, key) {
+    var n = stdNorm(normInput);
+    if (!stdIdx[n]) stdIdx[n] = key;
+  }
   function buildStdIdx() {
     if (stdIdx && stdIdxKB === window.KB) return;
     stdIdxKB = window.KB;
     stdIdx = {};
+    stdBasePrefixes = [];
     if (window.KB && KB.standards) {
-      Object.keys(KB.standards).forEach(function (k) { stdIdx[stdNorm(k)] = k; });
+      Object.keys(KB.standards).forEach(function (k) {
+        // 完整键名索引
+        stdIdx[stdNorm(k)] = k;
+        // 年份剥离别名：键带 -YYYY 时，无年份版本也指向原键
+        var n = stdNorm(k);
+        var ny = stripYear(n);
+        if (ny !== n && !stdIdx[ny]) stdIdx[ny] = k;
+        // "（所有部分）"后缀键：基数别名 + 子部分前缀匹配
+        var allM = k.match(/^(.+?)（所有部分）$/);
+        if (allM) {
+          var base = allM[1];
+          addStdAlias(base, k);
+          stdBasePrefixes.push({ baseNorm: stdNorm(base), key: k });
+        }
+        // 合并系列键（含 "/." 模式，如 GB/T 3480.1/.2/.3/.5）
+        // 注意：GB/T 中的斜杠不能切分，只切分 "/" 后紧跟 "." 的位置
+        if (k.indexOf('/.') !== -1) {
+          var parts = k.split(/\/(?=\.)/);
+          var first = parts[0];
+          var dotIdx = first.lastIndexOf('.');
+          var prefix = dotIdx >= 0 ? first.slice(0, dotIdx) : first;
+          addStdAlias(first, k);
+          for (var i = 1; i < parts.length; i++) {
+            var sub = parts[i];
+            if (sub.charAt(0) === '.') addStdAlias(prefix + sub, k);
+          }
+        }
+      });
     }
   }
   function kbBadge(type) {
@@ -449,9 +485,25 @@
   function kbLookup(p) {
     var key = kbMap(p);
     if (key) return key;
+    // 自引用：正文出现当前课程标准自身编号
+    if (CURRENT && CURRENT.code) {
+      var nSelf = stdNorm(p);
+      var selfN = stdNorm(CURRENT.code);
+      if (nSelf === selfN || stripYear(nSelf) === stripYear(selfN)) return '__self__';
+    }
     buildStdIdx();
     var n = stdNorm(p);
     if (stdIdx && stdIdx[n]) return stdIdx[n];
+    // 查询侧年份剥离二次匹配
+    var ny = stripYear(n);
+    if (ny !== n && stdIdx && stdIdx[ny]) return stdIdx[ny];
+    // "（所有部分）"基数 + 点号前缀匹配子部分
+    if (stdBasePrefixes) {
+      for (var i = 0; i < stdBasePrefixes.length; i++) {
+        var bp = stdBasePrefixes[i];
+        if (n.indexOf(bp.baseNorm + '.') === 0) return bp.key;
+      }
+    }
     return null;
   }
   function openKb(src, label) {
@@ -461,6 +513,12 @@
     var html = '';
     parts.forEach(function (p) {
       var key = kbLookup(p);
+      if (key === '__self__') {
+        var selfHead = '<div class="kb-key">' + kbBadge('std') + '<span class="kb-key-name">' + escHtml(CURRENT.code) + '</span> <span class="kb-title-sep">·</span> <span class="kb-key-title">本课程标准</span></div>';
+        var selfText = '<div class="kb-text">' + escHtml(CURRENT.name) + '（' + escHtml(CURRENT.code) + '）即当前学习的课程标准。正文引用本文件自身条款时，请参阅本课程讲解。</div>';
+        html += '<div class="kb-item kb-item-std">' + selfHead + selfText + '</div>';
+        return;
+      }
       var entry = key && (KB.items[key] || KB.special[key] || KB.standards[key]);
       if (entry) {
         var type = kbTypeOf(key);
