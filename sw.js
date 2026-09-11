@@ -1,5 +1,5 @@
 /* 风电标准学习平台 · Service Worker（PWA 离线缓存） */
-const CACHE_VERSION = 'unified-v4';
+const CACHE_VERSION = 'unified-v5';
 const CACHE_NAME = 'wind-learning-' + CACHE_VERSION;
 const ASSETS = [
   './',
@@ -52,7 +52,29 @@ const ASSETS = [
   './data/nbt10991/ch13.js',
   './data/nbt10991/ch14.js',
   './data/nbt10991/fill.js',
-  './data/nbt10991/kb.js'
+  './data/nbt10991/kb.js',
+  './data/gbt46154/images/fig_cover.png',
+  './data/gbt46154/images/fig_1.png',
+  './data/gbt46154/images/fig_2.png',
+  './data/gbt46154/images/fig_3.png',
+  './data/gbt46154/images/fig_4.png',
+  './data/gbt46154/images/fig_5.png',
+  './data/gbt46154/images/fig_6.png',
+  './data/gbt46154/images/fig_7.png',
+  './data/gbt46154/images/fig_8.png',
+  './data/gbt46154/images/fig_9.png',
+  './data/gbt46154/images/fig_10.png',
+  './data/gbt46154/images/fig_B1.png',
+  './data/gbt46154/images/fig_B2.png',
+  './data/gbt46154/images/fig_E1.png',
+  './data/gbt46154/images/fig_E2.png',
+  './data/nbt11773/images/fig_1.png',
+  './data/nbt11773/images/fig_2.png',
+  './data/nbt11773/images/fig_3.png',
+  './data/nbt11773/images/fig_4.png',
+  './data/nbt11773/images/fig_5.png',
+  './data/nbt11773/images/fig_6.png',
+  './data/nbt10991/images/appendix_A.jpg'
 ];
 
 self.addEventListener('install', function (event) {

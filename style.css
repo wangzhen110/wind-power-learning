@@ -567,3 +567,14 @@ button{font-family:inherit;cursor:pointer}
   .mnav-btn{font-size:10.5px;padding:0 3px;min-height:40px;letter-spacing:0}
   .mnav-btn.ghost{font-size:12px;padding:0 10px}
 }
+
+/* ============ 课程图片（讲解/题目/出处弹窗）============ */
+.slide-fig, .q-fig, .kb-fig {
+  display:block; max-width:100%; height:auto;
+  margin:12px auto; border:1px solid var(--line);
+  border-radius:10px; background:var(--panel);
+  padding:6px; box-sizing:border-box;
+}
+.q-fig-wrap { text-align:center; margin:8px 0 12px; }
+.q-fig-wrap .q-fig { margin:6px auto; }
+.kb-fig { max-width:280px; margin:8px auto; }

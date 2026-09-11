@@ -526,7 +526,8 @@
         var tDup = tRaw.replace(/\s+/g, '') === String(key).replace(/\s+/g, '');
         var title = (tRaw && !tDup) ? ' <span class="kb-title-sep">·</span> <span class="kb-key-title">' + escHtml(tRaw) + '</span>' : '';
         var head = '<div class="kb-key">' + kbBadge(type) + '<span class="kb-key-name">' + escHtml(key) + '</span>' + title + '</div>';
-        var text = '<div class="kb-text">' + escHtml(entry.c) + '</div>';
+        var kbFig = (entry.image && CURRENT) ? '<img class="kb-fig" src="data/' + CURRENT.id + '/' + entry.image + '" alt="' + escHtml(key) + '">' : '';
+        var text = kbFig + '<div class="kb-text">' + escHtml(entry.c) + '</div>';
         html += '<div class="kb-item kb-item-' + type + '">' + head + text + '</div>';
       } else {
         html += '<div class="kb-item kb-item-none">' + kbBadge('none') + '<div class="kb-key kb-key-name">' + escHtml(p) + '</div><div class="kb-text kb-missing">该出处暂未收录知识库条目，可查看对应课程讲解或原标准文本。</div></div>';
@@ -701,6 +702,23 @@
     if (q.t === 'judge') return ['正确', '错误'];
     return q.o;
   }
+  function fillFigWrap(textEl, figs) {
+    // 清理旧的图片容器
+    var old = textEl.parentNode.querySelector('.q-fig-wrap');
+    if (old) old.parentNode.removeChild(old);
+    if (!figs || !figs.length) return;
+    if (!CURRENT) return;
+    var w = document.createElement('div');
+    w.className = 'q-fig-wrap';
+    figs.forEach(function (fn) {
+      var im = document.createElement('img');
+      im.className = 'q-fig';
+      im.src = 'data/' + CURRENT.id + '/images/' + fn;
+      im.alt = fn;
+      w.appendChild(im);
+    });
+    textEl.parentNode.insertBefore(w, textEl.nextSibling);
+  }
   function renderQ() {
     var it = pool[qi];
     var q = it.q;
@@ -712,6 +730,7 @@
     $('qIdx').textContent = (qi + 1) + ' / ' + pool.length;
     $('qSourceTag').textContent = '出处见解析';
     $('qText').textContent = q.q;
+    fillFigWrap($('qText'), q.figs);
     $('quizRange').textContent = '共 ' + pool.length + ' 题';
 
     var wrap = $('qOptions');
@@ -1096,6 +1115,7 @@
     $('fqIdx').textContent = (fq + 1) + ' / ' + fpool.length;
     $('fqSourceTag').textContent = '出处见解析';
     $('fqText').textContent = q.q;
+    fillFigWrap($('fqText'), q.figs);
     $('ffRange').textContent = '共 ' + fpool.length + ' 题';
 
     var wrap = $('fqOptions');
