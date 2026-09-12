@@ -1,5 +1,5 @@
 /* 风电标准学习平台 · Service Worker（PWA 离线缓存） */
-const CACHE_VERSION = 'unified-v5';
+const CACHE_VERSION = 'unified-v6';
 const CACHE_NAME = 'wind-learning-' + CACHE_VERSION;
 const ASSETS = [
   './',

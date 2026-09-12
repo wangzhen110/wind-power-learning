@@ -410,6 +410,51 @@
     STD_RE.lastIndex = 0;
   }
 
+  /* ================= 交叉引用链接化（"见X.Y.Z" 可点击） ================= */
+  // 匹配"见"之后紧跟的目标；"见"本身保留为纯文本，只链接目标部分
+  // alternation 顺序：附录带子条款 > 附录 > 章节 > 图 > 表 > 附录条款 > 数字条款
+  var XREF_RE = /见(附录[A-Z]的[A-Z]\.\s?\d+(?:\.\s?\d+)*|附录[A-Z]|第\d+章|图\d+(?:~图\d+)?|表\d+|表[A-Z]\.\s?\d+(?:\.\s?\d+)*|[A-G]\.\s?\d+(?:\.\s?\d+)*|\d+(?:\.\s?\d+)+)/g;
+  function xrefKey(target) {
+    if (!target) return '';
+    // "附录B的B. 2.1" → 取"的"之后的子条款号并去空白
+    var subIdx = target.indexOf('的');
+    if (subIdx !== -1 && /^附录[A-Z]的/.test(target)) {
+      return target.slice(subIdx + 1).replace(/\s+/g, '');
+    }
+    // "图4~图6" → 取首图
+    var fm = target.match(/^图(\d+)~图/);
+    if (fm) return '图' + fm[1];
+    // 数字/附录条款等：去掉目标内部所有空白（PDF 拆行带空格）
+    return target.replace(/\s+/g, '');
+  }
+  function linkXrefs(escapedText) {
+    return String(escapedText).replace(XREF_RE, function (m, target) {
+      var key = xrefKey(target);
+      return '见<a class="xref-link" data-xref="' + escHtml(key) + '">' + target + '</a>';
+    });
+  }
+  function resolveXref(key) {
+    if (!key || !window.KB) return null;
+    // (a) items 精确
+    if (KB.items && KB.items[key]) return { key: key, entry: KB.items[key] };
+    // (b) 课程 kbMap 前缀映射，命中后在 items/special/standards 中校验
+    var mapped = kbMap(key);
+    if (mapped) {
+      var e = KB.items[mapped] || KB.special[mapped] || KB.standards[mapped];
+      if (e) return { key: mapped, entry: e };
+    }
+    // (c) 附录表（表A.1 类）未命中 → 回退到所属附录条目
+    var am = String(key).match(/^表([A-Z])\./);
+    if (am) {
+      var appKey = kbMap('附录' + am[1]);
+      if (appKey) {
+        var ae = KB.items[appKey] || KB.special[appKey] || KB.standards[appKey];
+        if (ae) return { key: appKey, entry: ae };
+      }
+    }
+    return null;
+  }
+
   /* ================= 知识库弹窗 ================= */
   function kbMap(p) {
     if (!CURRENT) return null;
@@ -506,6 +551,16 @@
     }
     return null;
   }
+  function renderKbItem(key, entry) {
+    var type = kbTypeOf(key);
+    var tRaw = String(entry.t || '');
+    var tDup = tRaw.replace(/\s+/g, '') === String(key).replace(/\s+/g, '');
+    var title = (tRaw && !tDup) ? ' <span class="kb-title-sep">·</span> <span class="kb-key-title">' + escHtml(tRaw) + '</span>' : '';
+    var head = '<div class="kb-key">' + kbBadge(type) + '<span class="kb-key-name">' + escHtml(key) + '</span>' + title + '</div>';
+    var kbFig = (entry.image && CURRENT) ? '<img class="kb-fig" src="data/' + CURRENT.id + '/' + entry.image + '" alt="' + escHtml(key) + '">' : '';
+    var text = kbFig + '<div class="kb-text">' + linkXrefs(escHtml(entry.c)) + '</div>';
+    return '<div class="kb-item kb-item-' + type + '">' + head + text + '</div>';
+  }
   function openKb(src, label) {
     if (!window.KB) { alert('知识库未加载'); return; }
     buildStdIdx();
@@ -521,14 +576,7 @@
       }
       var entry = key && (KB.items[key] || KB.special[key] || KB.standards[key]);
       if (entry) {
-        var type = kbTypeOf(key);
-        var tRaw = String(entry.t || '');
-        var tDup = tRaw.replace(/\s+/g, '') === String(key).replace(/\s+/g, '');
-        var title = (tRaw && !tDup) ? ' <span class="kb-title-sep">·</span> <span class="kb-key-title">' + escHtml(tRaw) + '</span>' : '';
-        var head = '<div class="kb-key">' + kbBadge(type) + '<span class="kb-key-name">' + escHtml(key) + '</span>' + title + '</div>';
-        var kbFig = (entry.image && CURRENT) ? '<img class="kb-fig" src="data/' + CURRENT.id + '/' + entry.image + '" alt="' + escHtml(key) + '">' : '';
-        var text = kbFig + '<div class="kb-text">' + escHtml(entry.c) + '</div>';
-        html += '<div class="kb-item kb-item-' + type + '">' + head + text + '</div>';
+        html += renderKbItem(key, entry);
       } else {
         html += '<div class="kb-item kb-item-none">' + kbBadge('none') + '<div class="kb-key kb-key-name">' + escHtml(p) + '</div><div class="kb-text kb-missing">该出处暂未收录知识库条目，可查看对应课程讲解或原标准文本。</div></div>';
       }
@@ -536,6 +584,20 @@
     $('kbTitle').textContent = '出处 · ' + src;
     $('kbBody').innerHTML = html;
     $('kbModal').classList.remove('hidden');
+  }
+  function openXref(normKey, anchorEl) {
+    if (!window.KB) return;
+    var kbBody = $('kbBody');
+    var res = resolveXref(normKey);
+    if (res) {
+      kbBody.insertAdjacentHTML('beforeend', '<div class="xref-sep">引用目标</div>' + renderKbItem(res.key, res.entry));
+    } else {
+      kbBody.insertAdjacentHTML('beforeend', '<div class="kb-item kb-item-none">' + kbBadge('none') + '<div class="kb-key kb-key-name">' + escHtml(normKey) + '</div><div class="kb-text kb-missing">该引用目标暂未收录，可查看对应课程讲解或原标准文本。</div></div>');
+    }
+    var lastItem = kbBody.lastElementChild;
+    if (lastItem && lastItem.scrollIntoView) {
+      try { lastItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (err) {}
+    }
   }
   function closeKb() { $('kbModal').classList.add('hidden'); }
 
@@ -931,6 +993,12 @@
   function closeSync() { $('syncModal').classList.add('hidden'); }
 
   document.addEventListener('click', function (e) {
+    var xrefEl = e.target.closest ? e.target.closest('.xref-link') : null;
+    if (xrefEl) {
+      e.preventDefault();
+      openXref(xrefEl.dataset.xref, xrefEl);
+      return;
+    }
     var el = e.target.closest ? e.target.closest('.src-link, .std-link') : null;
     if (!el) return;
     e.preventDefault();
