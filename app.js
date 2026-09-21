@@ -132,7 +132,7 @@
     var nick = $('rgNick').value.trim();
     var p = $('rgPass').value;
     var p2 = $('rgPass2').value;
-    if (!/^[\u4e00-\u9fa5A-Za-z0-9_\-.\u00b7]{1,30}$/.test(u)) { authMsg('rgMsg', '账号需为 1-30 位，支持中文、字母、数字及 _ - . · 符号'); return; }
+    if (!/^[\u4e00-\u9fa5A-Za-z0-9_\-.\u00b7@]{1,30}$/.test(u)) { authMsg('rgMsg', '账号需为 1-30 位，支持邮箱、中文、字母、数字及 _ - . · 符号'); return; }
     if (users[u]) { authMsg('rgMsg', '该账号已存在，请直接登录'); return; }
     if (p.length < 4) { authMsg('rgMsg', '密码至少 4 位'); return; }
     if (p !== p2) { authMsg('rgMsg', '两次输入的密码不一致'); return; }
