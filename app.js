@@ -291,6 +291,8 @@
   var KEY = '', FKEY = '';
   var view = 'lecture', curChap = 0, slideIdx = 0, playTimer = null, playing = false, speakOn = false;
   var pool = [], qi = 0, answered = false, chosen = [];
+  // 选择题乱序映射：curOrder[显示位置] = 原始选项索引；判断题为 null（按原序）
+  var curOrder = null;
   var FPOOL = [], fpool = [], fq = 0, fanswered = false;
   var CURRENT = null;
 
@@ -798,13 +800,23 @@
     var wrap = $('qOptions');
     wrap.innerHTML = '';
     wrap.className = 'options' + (q.t === 'multi' ? ' opt-multi' : '');
-    optsOf(q).forEach(function (txt, i) {
+    // 选择题（单选/多选）每次进入都重新乱序；判断题保持原序
+    var opts = optsOf(q);
+    var nOpts = opts.length;
+    curOrder = (q.t === 'single' || q.t === 'multi')
+      ? shuffle(opts.map(function (_, idx) { return idx; }))
+      : null;
+    for (var pos = 0; pos < nOpts; pos++) {
+      var orig = curOrder ? curOrder[pos] : pos;
       var d = document.createElement('div');
       d.className = 'opt';
-      d.innerHTML = '<div class="letter">' + LETTERS[i] + '</div><div>' + txt + '</div>';
-      d.onclick = function () { pick(i, d); };
+      d.setAttribute('data-o', String(orig));
+      d.innerHTML = '<div class="letter">' + LETTERS[pos] + '</div><div>' + opts[orig] + '</div>';
+      (function (o, el) {
+        el.onclick = function () { pick(o, el); };
+      })(orig, d);
       wrap.appendChild(d);
-    });
+    }
 
     $('qFeedback').classList.add('hidden');
     $('qMark').style.display = 'none';
@@ -852,15 +864,19 @@
     for (var n = 0; n < nodes.length; n++) {
       nodes[n].classList.add('locked');
       nodes[n].classList.remove('sel');
-      if (q.a.indexOf(n) >= 0) nodes[n].classList.add('right');
-      else if (chosen.indexOf(n) >= 0) nodes[n].classList.add('wrong');
+      var o = parseInt(nodes[n].getAttribute('data-o'), 10);
+      if (q.a.indexOf(o) >= 0) nodes[n].classList.add('right');
+      else if (chosen.indexOf(o) >= 0) nodes[n].classList.add('wrong');
     }
     var fb = $('qFeedback');
     fb.classList.remove('hidden');
     var head = $('fbHead');
     head.className = 'fb-head ' + (ok ? 'ok' : 'bad');
     head.textContent = ok ? '✓ 回答正确' : '✗ 回答错误';
-    $('fbAnswer').textContent = q.a.map(function (x) { return LETTERS[x] + '. ' + optsOf(q)[x]; }).join('　|　');
+    $('fbAnswer').textContent = q.a.map(function (x) {
+      var pos = curOrder ? curOrder.indexOf(x) : x;
+      return LETTERS[pos] + '. ' + optsOf(q)[x];
+    }).join('　|　');
     $('fbExplain').innerHTML = linkStandards(q.e);
     $('fbSource').innerHTML = '<button type="button" class="src-link" data-src="' + escHtml(q.s) + '">出处：' + escHtml(q.s) + ' <span class="src-arrow">▸</span></button>';
     $('qMark').style.display = 'inline-block';
@@ -1283,6 +1299,8 @@
     paper: [], idx: 0, ans: [], marked: {},
     remainSec: 0, timer: null, startedAt: 0, config: null
   };
+  // 模拟考试选择题乱序映射：exOrder[显示位置] = 原始选项索引；判断题为 null
+  var exOrder = null;
   function examKey() { return 'unified_v1_' + CURRENT.id + '_' + curUser() + '_exam'; }
   function examHistLoad() {
     try { var r = localStorage.getItem(examKey()); if (r) { var a = JSON.parse(r); return Array.isArray(a) ? a : []; } } catch (e) {}
@@ -1415,13 +1433,23 @@
       wrap.innerHTML = '';
       wrap.className = 'options' + (q.t === 'multi' ? ' opt-multi' : '');
       var curPick = EX.ans[EX.idx] || [];
-      optsOf(q).forEach(function (txt, i) {
+      // 选择题（单选/多选）每次进入都重新乱序；判断题保持原序
+      var opts = optsOf(q);
+      var nOpts = opts.length;
+      exOrder = (q.t === 'single' || q.t === 'multi')
+        ? shuffle(opts.map(function (_, idx) { return idx; }))
+        : null;
+      for (var pos = 0; pos < nOpts; pos++) {
+        var orig = exOrder ? exOrder[pos] : pos;
         var d = document.createElement('div');
-        d.className = 'opt' + (curPick.indexOf(i) >= 0 ? ' sel' : '');
-        d.innerHTML = '<div class="letter">' + LETTERS[i] + '</div><div>' + escHtml(txt) + '</div>';
-        d.onclick = function () { exPickChoice(i, d); };
+        d.className = 'opt' + (curPick.indexOf(orig) >= 0 ? ' sel' : '');
+        d.setAttribute('data-o', String(orig));
+        d.innerHTML = '<div class="letter">' + LETTERS[pos] + '</div><div>' + escHtml(opts[orig]) + '</div>';
+        (function (o, el) {
+          el.onclick = function () { exPickChoice(o, el); };
+        })(orig, d);
         wrap.appendChild(d);
-      });
+      }
     } else {
       $('exQChapter').textContent = '第' + q.ch + '章';
       $('exQType').textContent = '填空题';

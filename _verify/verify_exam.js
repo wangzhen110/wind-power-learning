@@ -80,13 +80,15 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   let found = findChoiceByText(curText);
   ok('当前题可在题库定位（选择/判断）', !!found);
   if (found) {
-    // 选第一个正确选项
+    // 选第一个正确选项：乱序后显示位置≠原始索引，用 data-o 定位正确节点
     const correctIdx = found.q.a[0];
     const optEls = d.querySelectorAll('#exQOptions .opt');
     ok('选项数与题目一致', optEls.length === found.opts.length, optEls.length + ' vs ' + found.opts.length);
-    optEls[correctIdx].click();
+    let targetOpt = null;
+    optEls.forEach(el => { if (parseInt(el.getAttribute('data-o'), 10) === correctIdx) targetOpt = el; });
+    targetOpt.click();
     await sleep(50);
-    ok('选中后选项高亮', optEls[correctIdx].classList.contains('sel'));
+    ok('选中后选项高亮', targetOpt.classList.contains('sel'));
     ok('当前题标记为已答（答题卡 done）', d.querySelectorAll('#exJumpGrid .jump-btn')[0].classList.contains('done'));
   }
 
