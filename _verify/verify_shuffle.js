@@ -257,19 +257,24 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     }
   }
 
-  // 逐题正确作答（含第一题，data-o 选正确项），共5题
+  // 逐题正确作答（含第一题，data-o 选正确项），共5题；同时记录正确项当前显示字母
   let answeredAll = true;
+  const expectedCorrectLetters = [];
   for (let i = 0; i < 5; i++) {
     const qt = $('exQText').textContent;
     const fq = findQ(qt);
     if (!fq) { answeredAll = false; break; }
     const els = Array.from(d.querySelectorAll('#exQOptions .opt'));
-    let clickedAny = false;
+    const letters = [];
     els.forEach(el => {
       const o = parseInt(el.getAttribute('data-o'), 10);
-      if (fq.q.a.indexOf(o) >= 0) { el.click(); clickedAny = true; }
+      if (fq.q.a.indexOf(o) >= 0) {
+        el.click();
+        letters.push(el.querySelector('.letter').textContent);
+      }
     });
-    if (!clickedAny) answeredAll = false;
+    expectedCorrectLetters.push(letters.slice().sort());
+    if (!letters.length) answeredAll = false;
     await sleep(50);
     if (i < 4) { $('exNext').click(); await sleep(60); }
   }
@@ -286,11 +291,20 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   } else {
     ok('结果卡片存在', false, 'cards=' + cards.length);
   }
-  // 详情：第一题 userAns == correctAns
+  // 详情：条数=5，且每题 userAns/correctAns 字母与乱序显示位置一致
   const details = d.querySelectorAll('#exDetailList .ex-detail');
-  if (details.length) {
-    ok('详情条数=5', details.length === 5, 'len=' + details.length);
+  ok('详情条数=5', details.length === 5, 'len=' + details.length);
+  let detailLettersMatch = true, mismatchInfo = '';
+  for (let i = 0; i < 5 && i < details.length; i++) {
+    const cr = details[i].querySelector('.xd-cr').textContent;
+    const ur = details[i].querySelector('.xd-ur').textContent;
+    const crLetters = (cr.match(/[A-F]/g) || []).sort().join(',');
+    const urLetters = (ur.match(/[A-F]/g) || []).sort().join(',');
+    const expect = expectedCorrectLetters[i].join(',');
+    if (crLetters !== expect) { detailLettersMatch = false; mismatchInfo = 'row' + i + ' cr=' + crLetters + ' expect=' + expect; }
+    if (urLetters !== expect) { detailLettersMatch = false; mismatchInfo = 'row' + i + ' ur=' + urLetters + ' expect=' + expect; }
   }
+  ok('交卷详情 userAns/correctAns 字母与乱序显示一致', detailLettersMatch, mismatchInfo);
 
   console.log('');
   console.log('乱序专项验证结果：' + pass + ' 通过 / ' + fail + ' 失败');

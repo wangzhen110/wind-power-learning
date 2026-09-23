@@ -1381,6 +1381,7 @@
     EX.config = res.cfg;
     EX.idx = 0;
     EX.ans = new Array(EX.paper.length);
+    EX.orders = new Array(EX.paper.length);
     EX.marked = {};
     EX.remainSec = res.cfg.dur * 60;
     EX.startedAt = Date.now();
@@ -1439,6 +1440,7 @@
       exOrder = (q.t === 'single' || q.t === 'multi')
         ? shuffle(opts.map(function (_, idx) { return idx; }))
         : null;
+      EX.orders[EX.idx] = exOrder ? exOrder.slice() : null;
       for (var pos = 0; pos < nOpts; pos++) {
         var orig = exOrder ? exOrder[pos] : pos;
         var d = document.createElement('div');
@@ -1530,8 +1532,9 @@
       if (cur.type === 'choice') {
         var pick = EX.ans[i] || [];
         ok = exGradeChoice(q, pick);
-        userAns = pick.map(function (x) { return LETTERS[x]; });
-        correctAns = q.a.map(function (x) { return LETTERS[x]; });
+        var order = (EX.orders && EX.orders[i]) ? EX.orders[i] : optsOf(q).map(function (_, idx) { return idx; });
+        userAns = pick.map(function (x) { return LETTERS[order.indexOf(x)]; });
+        correctAns = q.a.map(function (x) { return LETTERS[order.indexOf(x)]; });
       } else {
         var vals = EX.ans[i] || [];
         ok = exGradeFill(q, vals);
