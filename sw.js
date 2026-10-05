@@ -1,5 +1,5 @@
 /* 风电标准学习平台 · Service Worker（PWA 离线缓存） */
-const CACHE_VERSION = 'unified-v10';
+const CACHE_VERSION = 'unified-v11';
 const CACHE_NAME = 'wind-learning-' + CACHE_VERSION;
 const ASSETS = [
   './',
@@ -80,7 +80,9 @@ const ASSETS = [
 self.addEventListener('install', function (event) {
   event.waitUntil(
     caches.open(CACHE_NAME).then(function (cache) {
-      return cache.addAll(ASSETS);
+      return Promise.all(ASSETS.map(function (u) {
+        return cache.add(u).catch(function () {});
+      }));
     }).then(function () { return self.skipWaiting(); })
   );
 });
@@ -98,6 +100,25 @@ self.addEventListener('activate', function (event) {
 
 self.addEventListener('fetch', function (event) {
   if (event.request.method !== 'GET') return;
+  var isNavigate = event.request.mode === 'navigate' ||
+    (event.request.headers && event.request.headers.accept &&
+      event.request.headers.accept.indexOf('text/html') !== -1);
+  if (isNavigate) {
+    event.respondWith(
+      fetch(event.request).then(function (res) {
+        if (res && res.ok) {
+          var copy = res.clone();
+          caches.open(CACHE_NAME).then(function (c) { c.put(event.request, copy); });
+        }
+        return res;
+      }).catch(function () {
+        return caches.match('./index.html').then(function (hit) {
+          return hit || caches.match(event.request);
+        });
+      })
+    );
+    return;
+  }
   event.respondWith(
     caches.match(event.request).then(function (hit) {
       if (hit) return hit;

@@ -1818,6 +1818,11 @@
     }
   };
   if ('serviceWorker' in navigator && navigator.serviceWorker && typeof navigator.serviceWorker.register === 'function') {
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (sessionStorage.getItem('sw_reloaded')) return;
+      try { sessionStorage.setItem('sw_reloaded', '1'); } catch (e) {}
+      location.reload();
+    });
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('sw.js').catch(function () {});
     });
