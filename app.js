@@ -612,7 +612,7 @@
     CHAPTERS.forEach(function (c2, i) {
       var d = document.createElement('div');
       d.className = 'chap-item' + (i === curChap ? ' active' : '');
-      d.innerHTML = '<span>' + c2.title + '</span><span class="cnum">' + c2.questions.length + ' 题</span>';
+      d.innerHTML = '<span class="ctitle">' + c2.title + '</span><span class="cnum">' + c2.questions.length + ' 题</span><button type="button" class="chap-clear" title="清空本章记录" aria-label="清空本章记录">↺</button>';
       d.onclick = function () {
         curChap = i; slideIdx = 0;
         stopPlay();
@@ -620,6 +620,12 @@
         if (view === 'lecture') renderSlide();
         else { $('fChapter').value = String(c2.id); applyFilter(false); }
       };
+      d.querySelector('.chap-clear').addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (confirm('确定清空第 ' + c2.id + ' 章《' + c2.title + '》的全部答题记录（选择题与填空题）与标记吗？此操作不可撤销。')) {
+          clearChapter(c2.id);
+        }
+      });
       nav.appendChild(d);
     });
   }
@@ -1103,10 +1109,51 @@
   $('fType').onchange = function () { applyFilter(false); };
   $('fScope').onchange = function () { applyFilter(false); };
   $('fShuffle').onchange = function () { applyFilter(false); };
+  /* ================= 答题进度清空（全部 / 章节级，含选择与填空两库） ================= */
+  function refreshAfterClear() {
+    applyFilter(false);
+    fApplyFilter();
+    updateTopStats();
+    renderStats();
+    if (view === 'exam') { exResetState(); initExamView(); }
+    buildNav();
+  }
+  function clearAll() {
+    ST = { ans: {}, mark: {} };
+    STF = { ans: {}, mark: {} };
+    save(); fsave();
+    refreshAfterClear();
+  }
+  function clearChapter(id) {
+    ALL.forEach(function (it) {
+      if (it.ch.id === id) { delete ST.ans[it.gid]; delete ST.mark[it.gid]; }
+    });
+    FPOOL.forEach(function (it) {
+      if (Number(it.q.ch) === id) { delete STF.ans[it.gid]; delete STF.mark[it.gid]; }
+    });
+    save(); fsave();
+    refreshAfterClear();
+  }
   $('btnReset').onclick = function () {
-    if (confirm('确定清空当前账号在本课程的全部答题记录与标记吗？此操作不可撤销。')) {
-      ST = { ans: {}, mark: {} }; save();
-      applyFilter(false); updateTopStats(); renderStats();
+    if (confirm('确定清空当前账号在本课程的全部答题记录（含选择题与填空题）与标记吗？此操作不可撤销。')) {
+      clearAll();
+    }
+  };
+  // 窄屏移动端入口：读取本栏对应的章节下拉，具体章节走章节级清空，"全部章节"走全部清空
+  $('btnMClearQuiz').onclick = function () {
+    var v = $('fChapter').value;
+    if (v === 'all') {
+      if (confirm('当前为「全部章节」，将清空本课程全部答题记录（选择题与填空题）与标记，且不可撤销。确定吗？')) clearAll();
+    } else if (confirm('确定清空第 ' + v + ' 章的全部答题记录（选择题与填空题）与标记吗？此操作不可撤销。')) {
+      clearChapter(parseInt(v, 10));
+    }
+  };
+  $('btnMClearFill').onclick = function () {
+    var v = $('ffChapter').value;
+    if (v === 'all') {
+      if (confirm('当前为「全部章节」，将清空本课程全部答题记录（选择题与填空题）与标记，且不可撤销。确定吗？')) clearAll();
+    } else if (confirm('确定清空第 ' + v + ' 章的全部答题记录（选择题与填空题）与标记吗？此操作不可撤销。')) {
+      clearChapter(parseInt(v, 10));
     }
   };
   $('lecPrev').onclick = function () {
