@@ -1,5 +1,5 @@
 /* 风电标准学习平台 · Service Worker（PWA 离线缓存） */
-const CACHE_VERSION = 'unified-v11';
+const CACHE_VERSION = 'unified-v12';
 const CACHE_NAME = 'wind-learning-' + CACHE_VERSION;
 const ASSETS = [
   './',
@@ -100,6 +100,13 @@ self.addEventListener('activate', function (event) {
 
 self.addEventListener('fetch', function (event) {
   if (event.request.method !== 'GET') return;
+  // API 请求永远走网络，不缓存
+  if ((event.request.url || '').indexOf('/api/') !== -1) {
+    event.respondWith(fetch(event.request).catch(function () {
+      return new Response(JSON.stringify({ ok: false, error: '网络不可用' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+    }));
+    return;
+  }
   var isNavigate = event.request.mode === 'navigate' ||
     (event.request.headers && event.request.headers.accept &&
       event.request.headers.accept.indexOf('text/html') !== -1);

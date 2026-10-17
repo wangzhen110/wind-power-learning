@@ -453,6 +453,9 @@ button{font-family:inherit;cursor:pointer}
 .auth-msg.err{color:#d92d20}
 .auth-msg.ok{color:#12a150}
 .auth-foot{margin-top:18px;text-align:center;font-size:12px;color:#9aa3b2;line-height:1.6}
+.auth-server-status{margin-top:14px;text-align:center;font-size:12px;color:#9aa3b2;min-height:18px}
+.auth-server-status.ok{color:#16a34a}
+.auth-server-status.warn{color:#d97706}
 
 /* ---------- 课程门户 ---------- */
 .portal-view{background:#f3f6fb;display:flex;flex-direction:column}

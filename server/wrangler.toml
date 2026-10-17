@@ -1,0 +1,8 @@
+﻿name = "wind-power-learning-api"
+main = "src/index.js"
+compatibility_date = "2024-09-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "wind_power_learning"
+database_id = "6f4c4576-6a98-4d40-9e1f-200873ba55f8"

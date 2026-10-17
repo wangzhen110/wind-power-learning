@@ -66,6 +66,118 @@
   function hashPassword(salt, pwd) {
     return sha256(salt + ':' + encodeURIComponent(String(pwd)));
   }
+
+  /* ================= 服务器同步层（Cloudflare Workers + D1） ================= */
+  // API_BASE 可通过 localStorage 'api_base' 覆盖；部署后填入 Workers 域名
+  var API_BASE = (function () {
+    try { return localStorage.getItem('api_base') || 'https://wind-power-learning-api.6462717875.workers.dev'; } catch (e) { return 'https://wind-power-learning-api.6462717875.workers.dev'; }
+  })();
+  var API_TOKEN_KEY = 'api_token';
+  var serverAvailable = false;
+
+  function apiUrl(path) { return API_BASE + path; }
+  function getApiToken() {
+    try { return localStorage.getItem(API_TOKEN_KEY) || ''; } catch (e) { return ''; }
+  }
+  function setApiToken(t) {
+    try { if (t) localStorage.setItem(API_TOKEN_KEY, t); else localStorage.removeItem(API_TOKEN_KEY); } catch (e) {}
+  }
+  function apiFetch(path, options) {
+    options = options || {};
+    if (typeof fetch !== 'function') return Promise.reject(new Error('no fetch'));
+    var headers = options.headers || {};
+    headers['Content-Type'] = 'application/json';
+    var token = getApiToken();
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    options.headers = headers;
+    return fetch(apiUrl(path), options).then(function (r) {
+      return r.json().then(function (j) { return { status: r.status, data: j }; });
+    });
+  }
+  function apiRegister(user, password, nick) {
+    return apiFetch('/api/register', { method: 'POST', body: JSON.stringify({ user: user, password: password, nick: nick }) });
+  }
+  function apiLogin(user, password) {
+    return apiFetch('/api/login', { method: 'POST', body: JSON.stringify({ user: user, password: password }) });
+  }
+  function apiLogout() {
+    return apiFetch('/api/logout', { method: 'POST' }).catch(function () {});
+  }
+  function apiGetAllProgress() {
+    return apiFetch('/api/progress/all', { method: 'GET' });
+  }
+  function apiPutProgress(course, type, data) {
+    return apiFetch('/api/progress', { method: 'PUT', body: JSON.stringify({ course: course, type: type, data: data }) }).catch(function () {});
+  }
+  function checkServer() {
+    if (!API_BASE || typeof fetch !== 'function') { serverAvailable = false; updateServerStatus(); return Promise.resolve(false); }
+    return Promise.resolve().then(function () {
+      return fetch(apiUrl('/api/health'), { cache: 'no-store' });
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (j) { serverAvailable = !!(j && j.ok); updateServerStatus(); return serverAvailable; })
+      .catch(function () { serverAvailable = false; updateServerStatus(); return false; });
+  }
+  function updateServerStatus() {
+    var el = $('serverStatus');
+    if (!el) return;
+    if (serverAvailable) {
+      el.textContent = '云端已连接 · 进度自动同步';
+      el.className = 'auth-server-status ok';
+    } else if (API_BASE) {
+      el.textContent = '云端不可用 · 本地离线模式';
+      el.className = 'auth-server-status warn';
+    } else {
+      el.textContent = '';
+      el.className = 'auth-server-status';
+    }
+  }
+  // 登录后从服务器拉取全部进度，与本地合并（以 updated 时间戳为准，较新覆盖较旧）
+  function syncProgressFromServer() {
+    if (!serverAvailable || !getApiToken()) return Promise.resolve();
+    return apiGetAllProgress().then(function (res) {
+      if (!res.data || !res.data.ok || !res.data.progress) return;
+      var remote = res.data.progress;
+      var u = curUser();
+      if (!u) return;
+      for (var cid in remote) {
+        if (!remote.hasOwnProperty(cid)) continue;
+        var types = remote[cid];
+        for (var type in types) {
+          if (!types.hasOwnProperty(type)) continue;
+          var item = types[type];
+          if (!item || !item.data) continue;
+          var key = 'unified_v1_' + cid + '_' + u + '_' + type;
+          var localRaw = null;
+          try { localRaw = localStorage.getItem(key); } catch (e) {}
+          var localUpdated = 0;
+          if (localRaw) {
+            try {
+              var lo = JSON.parse(localRaw);
+              localUpdated = (lo && lo._serverUpdated) || 0;
+            } catch (e) {}
+          }
+          // 服务器较新则覆盖；本地较新则保留并稍后 push
+          if (item.updated > localUpdated) {
+            var toSave = item.data;
+            try {
+              toSave._serverUpdated = item.updated;
+              localStorage.setItem(key, JSON.stringify(toSave));
+            } catch (e) {}
+          }
+        }
+      }
+    }).catch(function () {});
+  }
+  // 本地保存后异步 push 到服务器
+  function pushProgressToServer(course, type, data) {
+    if (!serverAvailable || !getApiToken() || !course) return;
+    var clone = {};
+    try { clone = JSON.parse(JSON.stringify(data)); } catch (e) { clone = data; }
+    if (clone._serverUpdated) delete clone._serverUpdated;
+    apiPutProgress(course, type, clone);
+  }
+
   function randSalt() {
     var s = '';
     for (var i = 0; i < 16; i++) s += 'abcdef0123456789'[Math.floor(Math.random() * 16)];
@@ -120,12 +232,38 @@
     var u = $('liUser').value.trim();
     var p = $('liPass').value;
     if (!u || !p) { authMsg('liMsg', '请输入账号和密码'); return; }
+    if (serverAvailable) {
+      apiLogin(u, p).then(function (res) {
+        if (res.data && res.data.ok && res.data.token) {
+          setApiToken(res.data.token);
+          if (!users[u]) {
+            var salt = randSalt();
+            users[u] = { salt: salt, hash: hashPassword(salt, p), nick: res.data.nick || u, created: Date.now(), serverSync: true };
+            saveUsers();
+          } else {
+            users[u].serverSync = true;
+            if (res.data.nick) users[u].nick = res.data.nick;
+            saveUsers();
+          }
+          setSession(u);
+          syncProgressFromServer().finally(function () { enterPortal(); });
+        } else if (res.status === 401) {
+          authMsg('liMsg', (res.data && res.data.error) || '账号或密码不正确');
+        } else {
+          localLogin(u, p);
+        }
+      }).catch(function () { localLogin(u, p); });
+    } else {
+      localLogin(u, p);
+    }
+  };
+  function localLogin(u, p) {
     var rec = users[u];
     if (!rec) { authMsg('liMsg', '账号不存在，请先注册'); return; }
     if (hashPassword(rec.salt, p) !== rec.hash) { authMsg('liMsg', '密码不正确'); return; }
     setSession(u);
     enterPortal();
-  };
+  }
   $('formReg').onsubmit = function (e) {
     e.preventDefault();
     var u = $('rgUser').value.trim();
@@ -137,10 +275,28 @@
     if (p.length < 4) { authMsg('rgMsg', '密码至少 4 位'); return; }
     if (p !== p2) { authMsg('rgMsg', '两次输入的密码不一致'); return; }
     var salt = randSalt();
-    users[u] = { salt: salt, hash: hashPassword(salt, p), nick: nick || u, created: Date.now() };
+    var hash = hashPassword(salt, p);
+    users[u] = { salt: salt, hash: hash, nick: nick || u, created: Date.now(), serverSync: !!serverAvailable };
     saveUsers();
-    setSession(u);
-    enterPortal();
+    if (serverAvailable) {
+      apiRegister(u, p, nick || u).then(function (res) {
+        if (res.data && res.data.ok) {
+          return apiLogin(u, p).then(function (lr) {
+            if (lr.data && lr.data.ok && lr.data.token) {
+              setApiToken(lr.data.token);
+              users[u].serverSync = true;
+              saveUsers();
+            }
+          });
+        }
+      }).catch(function () {}).finally(function () {
+        setSession(u);
+        enterPortal();
+      });
+    } else {
+      setSession(u);
+      enterPortal();
+    }
   };
 
   /* ================= 课程配置 ================= */
@@ -309,8 +465,22 @@
     if (!STF.ans) STF.ans = {};
     if (!STF.mark) STF.mark = {};
   }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(ST)); } catch (e) {} }
-  function fsave() { try { localStorage.setItem(FKEY, JSON.stringify(STF)); } catch (e) {} }
+  function save() {
+    try {
+      var toSave = JSON.parse(JSON.stringify(ST));
+      toSave._serverUpdated = Date.now();
+      localStorage.setItem(KEY, JSON.stringify(toSave));
+    } catch (e) {}
+    if (CURRENT) pushProgressToServer(CURRENT.id, 'quiz', ST);
+  }
+  function fsave() {
+    try {
+      var toSave = JSON.parse(JSON.stringify(STF));
+      toSave._serverUpdated = Date.now();
+      localStorage.setItem(FKEY, JSON.stringify(toSave));
+    } catch (e) {}
+    if (CURRENT) pushProgressToServer(CURRENT.id, 'fill', STF);
+  }
 
   function initCourse(c) {
     CURRENT = c;
@@ -1353,7 +1523,10 @@
     try { var r = localStorage.getItem(examKey()); if (r) { var a = JSON.parse(r); return Array.isArray(a) ? a : []; } } catch (e) {}
     return [];
   }
-  function examHistSave(arr) { try { localStorage.setItem(examKey(), JSON.stringify(arr)); } catch (e) {} }
+  function examHistSave(arr) {
+    try { localStorage.setItem(examKey(), JSON.stringify(arr)); } catch (e) {}
+    if (CURRENT) pushProgressToServer(CURRENT.id, 'exam', arr);
+  }
   function exGidMap() {
     var m = {};
     ALL.forEach(function (it) { m[it.gid] = { type: 'choice', item: it }; });
@@ -1767,6 +1940,8 @@
   $('btnLogout2').onclick = doLogout;
   function doLogout() {
     if (!confirm('确定退出登录吗？')) return;
+    apiLogout();
+    setApiToken('');
     clearSession();
     clearCourseGlobals();
     showLogin();
@@ -1829,11 +2004,16 @@
   }
 
   /* ================= 初始化 ================= */
-  var bootUser = curUser();
-  if (bootUser) {
-    enterPortal();
-  } else {
-    showLogin();
-    showAuthForm('login');
-  }
+  checkServer().then(function () {
+    var bootUser = curUser();
+    if (bootUser) {
+      if (serverAvailable && getApiToken()) {
+        syncProgressFromServer();
+      }
+      enterPortal();
+    } else {
+      showLogin();
+      showAuthForm('login');
+    }
+  });
 })();

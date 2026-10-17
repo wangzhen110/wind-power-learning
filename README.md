@@ -78,3 +78,50 @@ sw.js / manifest.json  PWA 离线支持
 5. **系列号展开**：合并系列键（如 `GB/T 3480.1/.2/.3/.5`）自动展开子编号别名；`（所有部分）`后缀键（如 `GB/T 3880（所有部分）`）支持基数与子部分前缀匹配
 
 新增规范条目时统一录入不带年份的规范号到 `KB.standards`，年份变体由匹配层自动处理。
+
+## 云端同步（Cloudflare Workers + D1）
+
+平台支持账号与学习进度的云端同步，电脑/手机登录同一账号即可共享进度。服务器不可用时自动降级为本地离线模式。
+
+### 部署后端
+
+```bash
+cd server
+npm install
+
+# 1. 登录 Cloudflare（首次需浏览器授权）
+npx wrangler login
+
+# 2. 创建 D1 数据库（拿到 database_id 后填入 wrangler.toml）
+npx wrangler d1 create wind_power_learning
+
+# 3. 建表
+npx wrangler d1 execute wind_power_learning --remote --file=./schema.sql
+
+# 4. 部署 Workers
+npx wrangler deploy
+```
+
+部署后会得到一个 Workers 域名（如 `https://wind-power-learning-api.<子域>.workers.dev`）。
+
+### 前端配置
+
+将 Workers 域名写入前端：
+- 方式一（推荐）：在浏览器控制台执行 `localStorage.setItem('api_base', 'https://wind-power-learning-api.<子域>.workers.dev')`，刷新即可
+- 方式二：修改 `app.js` 中 `API_BASE` 的默认值
+
+配置后登录页会显示「云端已连接」，注册/登录与答题进度自动同步。
+
+### API 端点
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/health` | 健康检查 |
+| POST | `/api/register` | 注册（body: user, password, nick） |
+| POST | `/api/login` | 登录，返回 token（body: user, password） |
+| POST | `/api/logout` | 登出（需 Authorization） |
+| GET | `/api/progress?course=&type=` | 获取单课程进度（需鉴权） |
+| GET | `/api/progress/all` | 获取全部课程进度（需鉴权） |
+| PUT | `/api/progress` | 保存进度（body: course, type, data） |
+
+密码哈希与前端一致：`sha256(salt + ':' + encodeURIComponent(password))`。

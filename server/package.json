@@ -1,0 +1,16 @@
+{
+  "name": "wind-power-learning-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "风电标准学习平台后端 API（Cloudflare Workers + D1）",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:create": "wrangler d1 create wind_power_learning",
+    "db:init": "wrangler d1 execute wind_power_learning --file=./schema.sql",
+    "db:init:remote": "wrangler d1 execute wind_power_learning --remote --file=./schema.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^4.151.0"
+  }
+}
