@@ -111,12 +111,12 @@
   }
   function checkServer() {
     if (!API_BASE || typeof fetch !== 'function') { serverAvailable = false; updateServerStatus(); return Promise.resolve(false); }
-    return Promise.resolve().then(function () {
-      return fetch(apiUrl('/api/health'), { cache: 'no-store' });
-    })
-      .then(function (r) { return r.json(); })
+    var controller = new AbortController();
+    var timer = setTimeout(function () { controller.abort(); }, 5000);
+    return fetch(apiUrl('/api/health'), { cache: 'no-store', signal: controller.signal })
+      .then(function (r) { clearTimeout(timer); return r.json(); })
       .then(function (j) { serverAvailable = !!(j && j.ok); updateServerStatus(); return serverAvailable; })
-      .catch(function () { serverAvailable = false; updateServerStatus(); return false; });
+      .catch(function () { clearTimeout(timer); serverAvailable = false; updateServerStatus(); return false; });
   }
   function updateServerStatus() {
     var el = $('serverStatus');
@@ -2004,16 +2004,17 @@
   }
 
   /* ================= 初始化 ================= */
+  var bootUser = curUser();
+  if (bootUser) {
+    enterPortal();
+  } else {
+    showLogin();
+    showAuthForm('login');
+  }
+  // 后台检测服务器，不阻塞页面渲染；5秒超时自动降级
   checkServer().then(function () {
-    var bootUser = curUser();
-    if (bootUser) {
-      if (serverAvailable && getApiToken()) {
-        syncProgressFromServer();
-      }
-      enterPortal();
-    } else {
-      showLogin();
-      showAuthForm('login');
+    if (bootUser && serverAvailable && getApiToken()) {
+      syncProgressFromServer();
     }
   });
 })();
