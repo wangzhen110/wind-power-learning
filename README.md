@@ -102,13 +102,11 @@ npx wrangler d1 execute wind_power_learning --remote --file=./schema.sql
 npx wrangler deploy
 ```
 
-部署后会得到一个 Workers 域名（如 `https://wind-power-learning-api.<子域>.workers.dev`）。
+当前已部署地址：`https://wind-power-learning-api.6462717875.workers.dev`
 
 ### 前端配置
 
-将 Workers 域名写入前端：
-- 方式一（推荐）：在浏览器控制台执行 `localStorage.setItem('api_base', 'https://wind-power-learning-api.<子域>.workers.dev')`，刷新即可
-- 方式二：修改 `app.js` 中 `API_BASE` 的默认值
+前端 `app.js` 中 `API_BASE` 默认已指向上述部署地址，无需额外配置。如需临时切换（如本地开发），可在浏览器控制台执行 `localStorage.setItem('api_base', 'http://127.0.0.1:8787')`，刷新后生效；清除该键即恢复默认地址。
 
 配置后登录页会显示「云端已连接」，注册/登录与答题进度自动同步。
 

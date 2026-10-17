@@ -4,6 +4,7 @@ _verify/package-lock.json
 *.log
 node_modules/
 server/node_modules/
+server/.wrangler/
 _verify/audit_*.js
 _verify/diag_*.js
 _verify/tmp_*.js

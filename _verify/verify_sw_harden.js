@@ -79,8 +79,8 @@ function res(body, ok) {
       matchImpl: (req) => Promise.resolve(CORRUPT),           // caches.match 一律返回损坏假 HTML
       fetchImpl: (req) => Promise.resolve(GOOD),
     });
-    ok('CACHE_NAME = wind-learning-unified-v11', sw.CN === 'wind-learning-unified-v11', '实际 ' + sw.CN);
-    ok('CACHE_VERSION = unified-v11', sw.CV === 'unified-v11', '实际 ' + sw.CV);
+    ok('CACHE_NAME = wind-learning-unified-v12', sw.CN === 'wind-learning-unified-v12', '实际 ' + sw.CN);
+    ok('CACHE_VERSION = unified-v12', sw.CV === 'unified-v12', '实际 ' + sw.CV);
 
     const ev = navEvent({ method: 'GET', mode: 'navigate', headers: { accept: 'text/html' } });
     sw.listeners['fetch'](ev);

@@ -176,8 +176,10 @@ function buildGidMap() {
   ok('全部清空后 ST.mark 键数为 0', keysOf(st.quiz.mark).length === 0, '实际 ' + keysOf(st.quiz.mark).length);
   ok('全部清空后 STF.ans 键数为 0', keysOf(st.fill.ans).length === 0, '实际 ' + keysOf(st.fill.ans).length);
   ok('全部清空后 STF.mark 键数为 0', keysOf(st.fill.mark).length === 0, '实际 ' + keysOf(st.fill.mark).length);
-  ok('localStorage quiz 落盘为空对象', st.quizRaw === '{"ans":{},"mark":{}}', '实际 ' + st.quizRaw);
-  ok('localStorage fill 落盘为空对象', st.fillRaw === '{"ans":{},"mark":{}}', '实际 ' + st.fillRaw);
+  // 同步层会写入 _serverUpdated 时间戳字段，比较时剥离
+  function normRaw(s) { try { var o = JSON.parse(s); delete o._serverUpdated; return JSON.stringify(o); } catch (e) { return s; } }
+  ok('localStorage quiz 落盘为空对象', normRaw(st.quizRaw) === '{"ans":{},"mark":{}}', '实际 ' + st.quizRaw);
+  ok('localStorage fill 落盘为空对象', normRaw(st.fillRaw) === '{"ans":{},"mark":{}}', '实际 ' + st.fillRaw);
   ok('顶栏已答统计归零', $('sDone').textContent === '0', '实际 ' + $('sDone').textContent);
 
   /* ============ 场景 2：章节级清空 ============ */
